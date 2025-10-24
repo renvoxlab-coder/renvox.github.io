@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RENVOX – Technical Manufacturing Solutions</title>
+    <!-- Carga de Tailwind CSS CDN y Google Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500&family=Rajdhani:wght@600&display=swap" rel="stylesheet">
+    
+    <!-- Configuración personalizada de Tailwind para usar la paleta de RENVOX -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'renvox-petroleo': '#2D4A52',
+                        'renvox-verde': '#6AD1B8',
+                        'renvox-gris': '#E3E3E3',
+                        'renvox-grafito': '#181A1B',
+                    },
+                    fontFamily: {
+                        // Inter para texto secundario
+                        sans: ['Inter', 'sans-serif'],
+                        // Rajdhani SemiBold para títulos y logo
+                        heading: ['Rajdhani', 'sans-serif'], 
+                    },
+                    letterSpacing: {
+                        // Simula el tracking +25 sugerido
+                        'wide-25': '0.025em', 
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Estilos específicos para la línea de navegación activa */
+        .nav-item-active {
+            color: var(--tw-colors-renvox-petroleo);
+            border-bottom: 3px solid var(--tw-colors-renvox-petroleo);
+            font-weight: 500;
+        }
+
+        /* Clase para la imagen de placeholder */
+        .hero-image {
+            /* Placeholder para la pieza técnica */
+            background-image: url('https://placehold.co/800x400/E3E3E3/2D4A52?text=Pieza+Técnica+de+Precisión');
+            background-size: cover;
+            background-position: center;
+        }
+
+        /* Estilo para el icono de cubo modular (usado en la sección Servicios) */
+        .icon-box-modular {
+            /* Simula el cubo verde dentro del hexágono */
+            display: inline-flex;
+            width: 48px;
+            height: 48px;
+            background-color: #f7f7f7; /* Fondo sutil para el icono */
+            border-radius: 8px;
+            position: relative;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .icon-box-modular::before {
+            content: '';
+            position: absolute;
+            width: 70%;
+            height: 70%;
+            background-color: var(--tw-colors-renvox-verde);
+            /* Transformación para simular el cubo 3D simple */
+            transform: rotate(45deg) skewX(20deg) skewY(20deg);
+            opacity: 0.8;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+
+<body class="font-sans bg-white text-renvox-petroleo scroll-smooth">
+
+    <!-- HEADER & NAV BAR - Sticky para fácil navegación -->
+    <header class="border-b border-renvox-gris sticky top-0 bg-white z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex justify-between items-center">
+            
+            <!-- Logo RENVOX (Link a Inicio) -->
+            <a href="#inicio" class="flex items-center space-x-3 font-heading text-2xl font-semibold text-renvox-petroleo">
+                <!-- Isotipo (SVG basado en la estructura de cubo/hexágono) -->
+                <svg class="w-6 h-6" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Cubo Verde Técnico -->
+                    <rect x="25" y="25" width="50" height="50" fill="#6AD1B8" rx="4"/>
+                    <!-- Contorno Hexagonal Azul Petróleo -->
+                    <path d="M50 0L100 25V75L50 100L0 75V25Z" stroke="#2D4A52" stroke-width="8"/>
+                </svg>
+                <span class="logotipo">RENVOX</span>
+            </a>
+            
+            <!-- Navegación de Escritorio -->
+            <nav class="hidden md:flex space-x-8">
+                <a href="#inicio" class="nav-item nav-item-active px-1 pb-2 transition duration-300">Inicio</a>
+                <a href="#quienes-somos" class="nav-item text-renvox-grafito hover:text-renvox-petroleo px-1 pb-2 transition duration-300">Quiénes Somos</a>
+                <a href="#servicios" class="nav-item text-renvox-grafito hover:text-renvox-petroleo px-1 pb-2 transition duration-300">Servicios</a>
+                <a href="#casos" class="nav-item text-renvox-grafito hover:text-renvox-petroleo px-1 pb-2 transition duration-300">Casos</a>
+                <a href="#contacto" class="nav-item text-renvox-grafito hover:text-renvox-petroleo px-1 pb-2 transition duration-300">Contacto</a>
+            </nav>
+            
+            <!-- Icono de Menú para móvil (simulación) -->
+            <div class="md:hidden">
+                <!-- Icono de tres líneas de Lucide-React/SVG -->
+                <svg class="w-6 h-6 text-renvox-petroleo cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </div>
+        </div>
+    </header>
+
+    <main class="min-h-screen">
+        
+        <!-- SECCIÓN 1: HERO (INICIO) -->
+        <section id="inicio" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-20">
+            <div class="bg-renvox-gris rounded-xl overflow-hidden shadow-lg p-6 lg:p-10 flex flex-col lg:flex-row gap-8">
+                
+                <!-- Contenido de Texto -->
+                <div class="lg:w-1/2 flex flex-col justify-center">
+                    <h1 class="font-heading font-semibold text-4xl sm:text-5xl lg:text-6xl text-renvox-petroleo mb-3 leading-tight tracking-wide-25">
+                        ENGINEERING PRECISION
+                    </h1>
+                    <p class="font-sans font-medium text-lg text-renvox-grafito mb-8">
+                        Technical Manufacturing Solutions
+                    </p>
+                    <a href="#contacto" class="cta-button self-start px-8 py-3 bg-renvox-verde text-white font-medium rounded-lg hover:bg-opacity-90 transition duration-300 shadow-md">
+                        Cotizar pieza técnica
+                    </a>
+                </div>
+                
+                <!-- Imagen Hero (Mockup) -->
+                <div class="lg:w-1/2 min-h-[300px] lg:min-h-[400px] rounded-lg hero-image shadow-inner" role="img" aria-label="Imagen de una pieza de manufactura técnica de alta precisión.">
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 2: QUIÉNES SOMOS -->
+        <section id="quienes-somos" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-20">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+                <!-- Imagen o Gráfico de "Quienes Somos" -->
+                <div class="bg-renvox-gris p-8 rounded-xl min-h-[300px] flex items-center justify-center">
+                    <span class="font-heading text-renvox-petroleo text-xl">
+                        [Diagrama Esquemático o Estructural]
+                    </span>
+                </div>
+                
+                <!-- Texto de "Quienes Somos" -->
+                <div class="space-y-6">
+                    <h2 class="font-heading font-semibold text-3xl sm:text-4xl text-renvox-petroleo border-b-2 border-renvox-verde pb-2 inline-block">
+                        Quiénes Somos
+                    </h2>
+                    <p class="text-lg text-renvox-grafito">
+                        RENVOX es la unión de diseño e ingeniería, impulsando soluciones de manufactura técnica con un enfoque en la **modularidad, precisión y confianza técnica** para el sector B2B. Nuestro compromiso es transformar conceptos complejos en piezas funcionales y exactas, asegurando la máxima calidad desde el prototipo hasta la producción a escala.
+                    </p>
+                    <p class="text-base text-renvox-grafito opacity-80">
+                        Operamos con una filosofía sobria y profesional, evitando lo innecesario para centrarnos en lo esencial: la solución técnica a medida para su proyecto industrial.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 3: SERVICIOS (MODULARIDAD) -->
+        <section id="servicios" class="bg-renvox-gris py-10 lg:py-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="font-heading font-semibold text-3xl sm:text-4xl text-renvox-petroleo border-b-2 border-renvox-verde pb-2 inline-block mb-10">
+                    Servicios Modulares
+                </h2>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    
+                    <!-- Tarjeta 1: Prototipado Rápido -->
+                    <div class="bg-white border border-renvox-gris p-8 text-center rounded-lg shadow-sm hover:shadow-xl transition duration-300 space-y-3">
+                        <div class="icon-box-modular mx-auto"></div>
+                        <h3 class="font-heading font-semibold text-renvox-petroleo text-xl">Prototipado Rápido</h3>
+                        <p class="font-sans font-medium text-sm text-renvox-grafito">
+                            Verificación rápida de diseño y materialización de conceptos para validar la funcionalidad.
+                        </p>
+                    </div>
+
+                    <!-- Tarjeta 2: Manufactura CNC -->
+                    <div class="bg-white border border-renvox-gris p-8 text-center rounded-lg shadow-sm hover:shadow-xl transition duration-300 space-y-3">
+                        <div class="icon-box-modular mx-auto"></div>
+                        <h3 class="font-heading font-semibold text-renvox-petroleo text-xl">Manufactura CNC</h3>
+                        <p class="font-sans font-medium text-sm text-renvox-grafito">
+                            Piezas de alta precisión bajo demanda, optimizando tiempos y costos de producción.
+                        </p>
+                    </div>
+                    
+                    <!-- Tarjeta 3: Ingeniería de Materiales -->
+                    <div class="bg-white border border-renvox-gris p-8 text-center rounded-lg shadow-sm hover:shadow-xl transition duration-300 space-y-3">
+                        <div class="icon-box-modular mx-auto"></div>
+                        <h3 class="font-heading font-semibold text-renvox-petroleo text-xl">Ingeniería de Materiales</h3>
+                        <p class="font-sans font-medium text-sm text-renvox-grafito">
+                            Asesoramiento experto para seleccionar el polímero o metal ideal para su aplicación.
+                        </p>
+                    </div>
+                    
+                    <!-- Tarjeta 4: Control de Calidad Dimensional -->
+                    <div class="bg-white border border-renvox-gris p-8 text-center rounded-lg shadow-sm hover:shadow-xl transition duration-300 space-y-3">
+                        <div class="icon-box-modular mx-auto"></div>
+                        <h3 class="font-heading font-semibold text-renvox-petroleo text-xl">Control de Calidad Dimensional</h3>
+                        <p class="font-sans font-medium text-sm text-renvox-grafito">
+                            Verificación de tolerancias críticas y certificación de exactitud para componentes.
+                        </p>
+                    </div>
+                </div>
+                
+            </div>
+        </section>
+
+        <!-- SECCIÓN 4: CONTACTO -->
+        <section id="contacto" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-20">
+            <h2 class="font-heading font-semibold text-3xl sm:text-4xl text-renvox-petroleo border-b-2 border-renvox-verde pb-2 inline-block mb-10">
+                Contacto y Cotización
+            </h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                
+                <!-- Formulario de Contacto -->
+                <div class="lg:col-span-2 bg-white p-8 rounded-xl border border-renvox-gris shadow-lg">
+                    <h3 class="font-heading text-2xl text-renvox-petroleo mb-6">Envíenos su consulta técnica</h3>
+                    <form action="#" method="POST" class="space-y-4">
+                        <div>
+                            <label for="nombre" class="block text-sm font-medium text-renvox-petroleo">Nombre y Apellido</label>
+                            <input type="text" id="nombre" name="nombre" required 
+                                class="mt-1 block w-full border border-renvox-gris rounded-md shadow-sm p-3 focus:ring-renvox-verde focus:border-renvox-verde">
+                        </div>
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-renvox-petroleo">Email Corporativo</label>
+                            <input type="email" id="email" name="email" required 
+                                class="mt-1 block w-full border border-renvox-gris rounded-md shadow-sm p-3 focus:ring-renvox-verde focus:border-renvox-verde">
+                        </div>
+                        <div>
+                            <label for="proyecto" class="block text-sm font-medium text-renvox-petroleo">Detalles del Proyecto / Consulta</label>
+                            <textarea id="proyecto" name="proyecto" rows="4" required 
+                                class="mt-1 block w-full border border-renvox-gris rounded-md shadow-sm p-3 focus:ring-renvox-verde focus:border-renvox-verde"></textarea>
+                        </div>
+                        <button type="submit" class="w-full px-4 py-3 bg-renvox-petroleo text-white font-medium rounded-lg hover:bg-opacity-90 transition duration-300 shadow-lg">
+                            Enviar Solicitud
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Datos de Contacto Directo -->
+                <div class="lg:col-span-1 space-y-6">
+                    <h3 class="font-heading text-2xl text-renvox-petroleo">Contacto Directo</h3>
+                    
+                    <!-- Email Corporativo -->
+                    <div class="p-6 bg-renvox-gris rounded-xl border border-renvox-gris space-y-2">
+                        <p class="font-heading text-lg font-semibold text-renvox-petroleo">Email Corporativo</p>
+                        <a href="mailto:info@renvox.com.ar" class="text-renvox-grafito hover:text-renvox-verde transition duration-300 flex items-center">
+                            <!-- Icono Email (Inline SVG) -->
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-17 4v7a2 2 0 002 2h14a2 2 0 002-2v-7"></path></svg>
+                            info@renvox.com.ar
+                        </a>
+                    </div>
+
+                    <!-- Botón WhatsApp -->
+                    <div class="p-6 bg-renvox-gris rounded-xl border border-renvox-gris space-y-2">
+                         <p class="font-heading text-lg font-semibold text-renvox-petroleo">Asistencia por WhatsApp</p>
+                        <!-- Usando un número de ejemplo en Argentina (+54 9 11 xxxx-xxxx) -->
+                        <a href="https://wa.me/5491100000000?text=Hola,%20quisiera%20cotizar%20una%20pieza%20técnica." target="_blank" class="w-full inline-flex items-center justify-center px-4 py-3 bg-renvox-verde text-white font-medium rounded-lg hover:bg-opacity-90 transition duration-300 shadow-md">
+                            <!-- Icono WhatsApp (Inline SVG) -->
+                            <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12.04 2c-5.52 0-10 4.48-10 10 0 1.76.46 3.42 1.25 4.88l-1.32 4.86 5.02-1.28c1.47.81 3.16 1.27 4.93 1.27h.06c5.52 0 10-4.48 10-10S17.56 2 12.04 2zM17 15.54c-.11.33-.42.75-.82.88-.41.13-1.01.07-2.31-.64s-1.89-1.92-2.17-2.38c-.28-.46-.02-.71-.25-.94-.25-.25-.6-.28-.84-.28-.24 0-.46.03-.7.03-.24 0-.64.12-.97.48-.34.37-1.31 1.28-1.31 3.12 0 1.84 1.34 3.59 1.52 3.84.18.25 2.62 3.99 6.27 5.25.97.33 1.76.53 2.37.67.92.21 1.75.18 2.4-.08.71-.27 2.33-.94 2.65-1.99.32-1.05.32-1.95.22-2.12-.11-.19-.41-.3-.88-.54z"></path></svg>
+                            Enviar WhatsApp
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 5: CASOS (Placeholder) -->
+        <section id="casos" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-20">
+            <h2 class="font-heading font-semibold text-3xl sm:text-4xl text-renvox-petroleo border-b-2 border-renvox-verde pb-2 inline-block mb-10">
+                Casos de Uso (Case Studies)
+            </h2>
+            <div class="bg-renvox-gris p-10 rounded-xl text-center">
+                <p class="text-xl text-renvox-petroleo opacity-70">
+                    Próximamente: Detalle de nuestros proyectos de manufactura técnica de éxito.
+                </p>
+            </div>
+        </section>
+        
+    </main>
+
+    <!-- FOOTER (Simple y Sobrio) -->
+    <footer class="bg-renvox-petroleo text-renvox-gris py-8 text-center">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-2">
+            <p class="text-xl font-heading text-white">RENVOX</p>
+            <p class="text-sm font-sans">&copy; 2025 RENVOX. Technical Manufacturing Solutions. | Todos los derechos reservados.</p>
+            <p class="text-xs font-sans">Email: <a href="mailto:info@renvox.com.ar" class="underline hover:text-renvox-verde">info@renvox.com.ar</a></p>
+        </div>
+    </footer>
+
+</body>
+</html>
