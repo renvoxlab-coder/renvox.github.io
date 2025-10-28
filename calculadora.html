@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Costo de Impresión 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Definición de la fuente para un diseño moderno */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Ajuste específico para los contenedores de inputs en dos columnas */
+        .grid-container {
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+        /* Estilo para los inputs de solo lectura controlados por el dropdown */
+        .readonly-input {
+            background-color: #f3f4f6; /* gray-100 */
+            cursor: default;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-5 flex justify-center items-start">
+
+<div class="container w-full max-w-4xl bg-white rounded-xl shadow-2xl p-6 md:p-10">
+    <h1 class="text-3xl font-extrabold text-blue-600 text-center mb-8 border-b-2 border-blue-100 pb-4">
+        💰 Calculadora de Costo de Impresión 3D
+    </h1>
+
+    <!-- ---------------------------------------------------- -->
+    <!-- SECCIÓN 1: PARÁMETROS BASE COMUNES (PEQUEÑOS Y GRISES) -->
+    <!-- ---------------------------------------------------- -->
+    <h2 class="text-xl font-bold text-gray-700 mb-4 pt-4 border-t-2 border-gray-100">
+        1. Parámetros Base Comunes (Valores por Defecto)
+    </h2>
+    <div class="grid-container grid gap-4 p-4 mb-8 bg-gray-200 rounded-xl text-xs">
+        
+        <!-- Filament cost per kg (AR$) -->
+        <div class="flex flex-col space-y-1">
+            <label for="filament_price_kg" class="font-bold text-gray-700">Filament cost per kg (AR$):</label>
+            <input type="number" id="filament_price_kg" value="23500.0" step="0.01" oninput="calculateCost()"
+                   class="p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+        
+        <!-- Electricity cost (AR$/kWh) -->
+        <div class="flex flex-col space-y-1">
+            <label for="electricity_cost" class="font-bold text-gray-700">Electricity cost (AR$/kWh):</label>
+            <input type="number" id="electricity_cost" value="3000.0" step="0.01" oninput="calculateCost()"
+                   class="p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+        
+        <!-- Consumption (kWh/hour) -->
+        <div class="flex flex-col space-y-1">
+            <label for="consumption_kwh_h" class="font-bold text-gray-700">Consumption (kWh/hour):</label>
+            <input type="number" id="consumption_kwh_h" value="0.1" step="0.001" oninput="calculateCost()"
+                   class="p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+        
+        <!-- Labor cost per hour (AR$) -->
+        <div class="flex flex-col space-y-1">
+            <label for="labor_cost_h" class="font-bold text-gray-700">Labor cost per hour (AR$):</label>
+            <input type="number" id="labor_cost_h" value="500.0" step="0.01" oninput="calculateCost()"
+                   class="p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+        
+        <!-- Failure rate (%) -->
+        <div class="flex flex-col space-y-1">
+            <label for="failure_rate" class="font-bold text-gray-700">Failure rate (%):</label>
+            <input type="number" id="failure_rate" value="10.0" step="0.1" oninput="calculateCost()"
+                   class="p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+        
+        <!-- Profit margin (%) -->
+        <div class="flex flex-col space-y-1">
+            <label for="profit_margin" class="font-bold text-gray-700">Profit margin (%):</label>
+            <input type="number" id="profit_margin" value="40.0" step="0.1" oninput="calculateCost()"
+                   class="p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+    </div>
+    
+    <!-- ---------------------------------------------------- -->
+    <!-- SECCIÓN 2: SELECCIÓN DE IMPRESORA (AMORTIZACIÓN) -->
+    <!-- ---------------------------------------------------- -->
+    <h2 class="text-xl font-bold text-gray-700 mb-4">
+        2. Configuración de Impresora
+    </h2>
+    <div class="grid-container grid gap-6 mb-8 p-4 border border-blue-200 rounded-xl">
+        
+        <!-- Dropdown and Button Container (span 2 columns on mobile/desktop) -->
+        <div class="flex flex-col space-y-2 col-span-full grid md:grid-cols-2 gap-6">
+            <!-- Dropdown Selector -->
+            <div class="flex flex-col space-y-2">
+                <label for="printer_model" class="font-bold text-blue-600">Modelo de Printer:</label>
+                <select id="printer_model" onchange="updatePrinterParams()"
+                        class="p-3 border border-blue-400 bg-blue-50 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 font-semibold">
+                    <option value="BambuLab A1" selected>BambuLab A1</option>
+                    <option value="Artillery X2">Artillery X2</option>
+                    <option value="Ender S1 Pro">Ender S1 Pro</option>
+                </select>
+            </div>
+
+            <!-- Botón para ver/ocultar detalles -->
+            <div class="flex items-end">
+                <button id="toggle_details_btn" onclick="toggleDetails()"
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-200 text-sm">
+                    Ver detalles
+                </button>
+            </div>
+        </div>
+
+        <!-- Contenedor de detalles (Inicialmente oculto) -->
+        <div id="printer_details_container" class="grid-container grid gap-6 col-span-full hidden mt-4">
+            <!-- Parámetros Dependientes -->
+            <div class="flex flex-col space-y-2">
+                <label for="machine_cost" class="font-bold text-gray-700">Machine cost (AR$):</label>
+                <input type="number" id="machine_cost" readonly oninput="calculateCost()"
+                       class="p-3 border border-gray-300 rounded-lg readonly-input">
+            </div>
+            <div class="flex flex-col space-y-2">
+                <label for="machine_life_h" class="font-bold text-gray-700">Machine lifespan (hours):</label>
+                <input type="number" id="machine_life_h" readonly oninput="calculateCost()"
+                       class="p-3 border border-gray-300 rounded-lg readonly-input">
+            </div>
+            <div class="flex flex-col space-y-2">
+                <label for="maintenance_rate" class="font-bold text-gray-700">Maintenance (% anual):</label>
+                <input type="number" id="maintenance_rate" readonly oninput="calculateCost()"
+                       class="p-3 border border-gray-300 rounded-lg readonly-input">
+            </div>
+        </div>
+    </div>
+
+    <!-- ---------------------------------------------------- -->
+    <!-- SECCIÓN 3: PARÁMETROS VARIABLES DE LA PIEZA -->
+    <!-- ---------------------------------------------------- -->
+    <h2 class="text-xl font-bold text-gray-700 mb-4">
+        3. Parámetros Variables de la Pieza
+    </h2>
+    <div class="grid-container grid gap-6 mb-8 p-4 border border-gray-300 rounded-xl">
+        <!-- Filament used (g) -->
+        <div class="flex flex-col space-y-2">
+            <label for="filament_g" class="font-bold text-gray-700">Filament used (g):</label>
+            <input type="number" id="filament_g" value="0.0" step="0.01" oninput="calculateCost()"
+                   class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+        <!-- Print time (hours) -->
+        <div class="flex flex-col space-y-2">
+            <label for="print_time_h" class="font-bold text-gray-700">Print time (hours):</label>
+            <input type="number" id="print_time_h" value="0.0" step="0.01" oninput="calculateCost()"
+                   class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+        <!-- Prep + postprocess time (hours) -->
+        <div class="flex flex-col space-y-2">
+            <label for="prep_postprocess_time_h" class="font-bold text-gray-700">Prep + postprocess time (hours):</label>
+            <input type="number" id="prep_postprocess_time_h" value="0.5" step="0.01" oninput="calculateCost()"
+                   class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+        <!-- Extras (AR$) -->
+        <div class="flex flex-col space-y-2">
+            <label for="extras" class="font-bold text-gray-700">Extras (AR$):</label>
+            <input type="number" id="extras" value="0.0" step="0.01" oninput="calculateCost()"
+                   class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+        </div>
+    </div>
+    
+    <!-- Espacio para el botón original (mantener el flujo vertical) -->
+    <div class="flex justify-center mt-6 h-4">
+        <!-- El cálculo es automático -->
+    </div>
+
+    <!-- Tarjeta de Resultados -->
+    <div class="results-card bg-gray-50 p-6 rounded-xl shadow-inner mt-10 border border-gray-200">
+        <h2 class="text-2xl font-bold text-blue-600 mb-4 pb-2 border-b-2 border-blue-300">
+            📈 Resumen de Costos
+        </h2>
+        <div id="results" class="space-y-3">
+            <!-- Los resultados se inyectarán aquí -->
+            <div class="flex justify-between items-center py-2 border-b border-gray-200"><span class="font-medium text-gray-600">Material cost:</span><span id="res_material_cost" class="font-semibold text-right text-gray-800"></span></div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200"><span class="font-medium text-gray-600">Energy cost:</span><span id="res_energy_cost" class="font-semibold text-right text-gray-800"></span></div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200"><span class="font-medium text-gray-600">Machine amortization cost:</span><span id="res_machine_cost_part" class="font-semibold text-right text-gray-800"></span></div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200"><span class="font-medium text-gray-600">Labor cost:</span><span id="res_labor_total" class="font-semibold text-right text-gray-800"></span></div>
+            
+            <div class="flex justify-between items-center pt-4 border-t border-gray-400"><span class="font-bold text-lg text-gray-800">Subtotal (Costos Directos):</span><span id="res_subtotal" class="font-extrabold text-lg text-gray-900 text-right"></span></div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200"><span class="font-bold text-gray-700">Adjusted total (incl. Failure Rate):</span><span id="res_adjusted_cost" class="font-extrabold text-xl text-red-600 text-right"></span></div>
+            
+            <div class="flex justify-between items-center pt-4"><span class="font-bold text-2xl text-blue-800">Final price (+ Profit + Extras):</span><span id="res_final_price" class="font-extrabold text-2xl text-green-600 text-right"></span></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Datos de los modelos de impresora
+    const PRINTER_DATA = {
+        "BambuLab A1": {
+            cost: 1360000.0,
+            lifespan: 5000,
+            maintenance_rate: 10.0
+        },
+        "Artillery X2": {
+            cost: 600000.0,
+            lifespan: 3000,
+            maintenance_rate: 10.0
+        },
+        "Ender S1 Pro": {
+            cost: 400000.0,
+            lifespan: 4000,
+            maintenance_rate: 10.0
+        }
+    };
+
+    /**
+     * Función para obtener el valor numérico de un campo de entrada.
+     * @param {string} id - El ID del elemento input.
+     * @returns {number} El valor numérico parseado, o 0 si no es válido.
+     */
+    function getVal(id) {
+        const element = document.getElementById(id);
+        if (element && element.value !== "") {
+            // Reemplaza comas por puntos en caso de que el navegador no lo maneje correctamente
+            return parseFloat(element.value.replace(',', '.')) || 0;
+        }
+        return 0;
+    }
+
+    /**
+     * Función para dar formato de moneda AR$ a un valor.
+     * @param {number} value - El valor numérico a formatear.
+     * @returns {string} El valor formateado como moneda argentina.
+     */
+    function formatCurrency(value) {
+        // Formato solicitado: AR$ y decimales
+        return value.toLocaleString("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 2 });
+    }
+
+    /**
+     * Alterna la visibilidad y editabilidad de los parámetros de la impresora.
+     */
+    function toggleDetails() {
+        const container = document.getElementById('printer_details_container');
+        const button = document.getElementById('toggle_details_btn');
+        const inputs = [
+            document.getElementById('machine_cost'),
+            document.getElementById('machine_life_h'),
+            document.getElementById('maintenance_rate')
+        ];
+        
+        // Alternar visibilidad
+        container.classList.toggle('hidden');
+
+        if (container.classList.contains('hidden')) {
+            // Ocultar detalles: volver a solo lectura y actualizar botón
+            button.textContent = 'Ver detalles';
+            inputs.forEach(input => {
+                input.setAttribute('readonly', true);
+                input.classList.add('readonly-input');
+            });
+            // Al ocultar, forzamos un recálculo para asegurar que se usan los valores del dropdown (por si se editaron manualmente)
+            updatePrinterParams(); 
+        } else {
+            // Mostrar detalles: permitir edición y actualizar botón
+            button.textContent = 'Ocultar detalles';
+            inputs.forEach(input => {
+                input.removeAttribute('readonly');
+                input.classList.remove('readonly-input');
+            });
+        }
+    }
+
+    /**
+     * Actualiza los campos de costo, vida útil y mantenimiento de la máquina 
+     * basándose en la selección del dropdown 'Printer'.
+     */
+    function updatePrinterParams() {
+        const selectedPrinter = document.getElementById('printer_model').value;
+        const data = PRINTER_DATA[selectedPrinter];
+        const detailsContainer = document.getElementById('printer_details_container');
+
+        if (data) {
+            // Solo actualiza los inputs si están en modo de solo lectura (o si están ocultos)
+            // Si el usuario los está viendo y editando, no queremos sobreescribirlos.
+            if (document.getElementById('machine_cost').readOnly || detailsContainer.classList.contains('hidden')) {
+                document.getElementById('machine_cost').value = data.cost.toFixed(2);
+                document.getElementById('machine_life_h').value = data.lifespan;
+                document.getElementById('maintenance_rate').value = data.maintenance_rate.toFixed(1);
+            }
+            
+            // Forzamos el recálculo
+            calculateCost(); 
+        }
+    }
+
+    /**
+     * Función principal que calcula todos los costos según las fórmulas.
+     */
+    function calculateCost() {
+        // 🎛️ Obtención de Parámetros (Lectura de inputs)
+        const filament_g = getVal('filament_g');
+        const filament_price_kg = getVal('filament_price_kg');
+        const print_time_h = getVal('print_time_h');
+        const electricity_cost = getVal('electricity_cost');
+        const consumption_kwh_h = getVal('consumption_kwh_h');
+        
+        // Parámetros de la impresora (se leen de los inputs que son actualizados por el dropdown o editados manualmente)
+        const machine_cost = getVal('machine_cost');
+        const machine_life_h = getVal('machine_life_h');
+        const maintenance = getVal('maintenance_rate'); // % anual
+        
+        const labor_cost_h = getVal('labor_cost_h');
+        const prep_time = getVal('prep_postprocess_time_h');
+        const failure_rate = getVal('failure_rate');
+        const profit_margin = getVal('profit_margin');
+        const extras = getVal('extras');
+
+        // ⚙️ Fórmulas Aplicadas
+        
+        // 1. Costo de Material
+        // material_cost = (filament_g / 1000) * filament_price_kg
+        const material_cost = (filament_g / 1000) * filament_price_kg;
+
+        // 2. Costo de Energía
+        // energy_cost = print_time * consumption_kwh_h * electricity_cost
+        const energy_cost = print_time_h * consumption_kwh_h * electricity_cost;
+
+        // 3. Costo por Hora de Máquina (Amortización + Mantenimiento)
+        // machine_hour_cost = (machine_cost / machine_life_h) + (maintenance * machine_cost / 100 / machine_life_h)
+        let machine_hour_cost = 0;
+        if (machine_life_h > 0) {
+            machine_hour_cost = (machine_cost / machine_life_h) + 
+                                ((maintenance / 100) * machine_cost / machine_life_h);
+        }
+
+        // 4. Costo de Amortización de Máquina en esta Pieza
+        // machine_cost_part = print_time * machine_hour_cost
+        const machine_cost_part = print_time_h * machine_hour_cost;
+
+        // 5. Costo de Mano de Obra
+        // labor_total = (prep_time) * labor_cost_h
+        const labor_total = prep_time * labor_cost_h;
+
+        // 6. Subtotal de Costos Directos
+        // subtotal = material_cost + energy_cost + machine_cost_part + labor_total
+        const subtotal = material_cost + energy_cost + machine_cost_part + labor_total;
+
+        // 7. Costo Ajustado (incluyendo tasa de fallo)
+        // adjusted_cost = subtotal * (1 + failure_rate / 100)
+        const adjusted_cost = subtotal * (1 + failure_rate / 100);
+
+        // 8. Precio Final (incluyendo margen de beneficio y extras)
+        // final_price = adjusted_cost * (1 + profit_margin / 100) + extras
+        const final_price = adjusted_cost * (1 + profit_margin / 100) + extras;
+
+        // 💡 Actualización de Resultados en Pantalla
+        document.getElementById('res_material_cost').textContent = formatCurrency(material_cost);
+        document.getElementById('res_energy_cost').textContent = formatCurrency(energy_cost);
+        document.getElementById('res_machine_cost_part').textContent = formatCurrency(machine_cost_part);
+        document.getElementById('res_labor_total').textContent = formatCurrency(labor_total);
+        document.getElementById('res_subtotal').textContent = formatCurrency(subtotal);
+        document.getElementById('res_adjusted_cost').textContent = formatCurrency(adjusted_cost);
+        document.getElementById('res_final_price').textContent = formatCurrency(final_price);
+    }
+
+    // Inicializar el cálculo al cargar la página
+    document.addEventListener('DOMContentLoaded', () => {
+        // 1. Inicializar los parámetros de la impresora con el valor por defecto ("BambuLab A1")
+        updatePrinterParams(); 
+        
+        // 2. Enlazar eventos de input para todos los campos editables y el dropdown
+        document.querySelectorAll('.grid-container input[type="number"], #printer_model').forEach(element => {
+            // Excluimos los inputs de la máquina, ya que tienen su oninput en el HTML y su editabilidad es dinámica.
+            if (element.id !== 'machine_cost' && element.id !== 'machine_life_h' && element.id !== 'maintenance_rate') {
+                element.addEventListener('input', calculateCost);
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
