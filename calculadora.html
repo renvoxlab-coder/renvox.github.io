@@ -19,6 +19,11 @@
             background-color: #f3f4f6; /* gray-100 */
             cursor: default;
         }
+        /* Estilo para asegurar que el contenido preformateado respete los saltos de línea */
+        #formulaDisplay {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-5 flex justify-center items-start">
@@ -29,7 +34,7 @@
     </h1>
 
     <!-- ---------------------------------------------------- -->
-    <!-- SECCIÓN 1: PARÁMETROS BASE COMUNES (PEQUEÑOS Y GRISES) -->
+    <!-- SECCIÓN 1: PARÁMETROS BASE COMUNES -->
     <!-- ---------------------------------------------------- -->
     <h2 class="text-xl font-bold text-gray-700 mb-4 pt-4 border-t-2 border-gray-100">
         1. Parámetros Base Comunes (Valores por Defecto)
@@ -47,13 +52,6 @@
         <div class="flex flex-col space-y-1">
             <label for="electricity_cost" class="font-bold text-gray-700">Electricity cost (AR$/kWh):</label>
             <input type="number" id="electricity_cost" value="3000.0" step="0.01" oninput="calculateCost()"
-                   class="p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
-        </div>
-        
-        <!-- Consumption (kWh/hour) -->
-        <div class="flex flex-col space-y-1">
-            <label for="consumption_kwh_h" class="font-bold text-gray-700">Consumption (kWh/hour):</label>
-            <input type="number" id="consumption_kwh_h" value="0.1" step="0.001" oninput="calculateCost()"
                    class="p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
         </div>
         
@@ -127,6 +125,12 @@
                 <input type="number" id="maintenance_rate" readonly oninput="calculateCost()"
                        class="p-3 border border-gray-300 rounded-lg readonly-input">
             </div>
+            <!-- Consumption (kWh/hour) - Ahora dependiente de la impresora -->
+            <div class="flex flex-col space-y-2">
+                <label for="consumption_kwh_h" class="font-bold text-gray-700">Consumption (kWh/hour):</label>
+                <input type="number" id="consumption_kwh_h" readonly oninput="calculateCost()" step="0.001"
+                       class="p-3 border border-gray-300 rounded-lg readonly-input">
+            </div>
         </div>
     </div>
 
@@ -186,25 +190,46 @@
             <div class="flex justify-between items-center pt-4"><span class="font-bold text-2xl text-blue-800">Final price (+ Profit + Extras):</span><span id="res_final_price" class="font-extrabold text-2xl text-green-600 text-right"></span></div>
         </div>
     </div>
+
+    <!-- SECCIÓN DE FÓRMULA SOLICITADA -->
+    <div id="formulaSection" class="mt-10 pt-6 border-t border-gray-200 hidden">
+        <button id="toggleFormulaBtn" onclick="toggleFormula()"
+                class="w-full py-3 px-4 text-sm font-semibold rounded-lg border border-gray-400 text-gray-800 hover:bg-gray-100 transition duration-150 focus:outline-none focus:ring-2 focus:ring-gray-300">
+            Ver Detalle de Fórmulas
+        </button>
+        
+        <div id="formulaContent" class="mt-4 p-6 bg-gray-50 rounded-xl border border-gray-300 hidden">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">Fórmulas Aplicadas con tus Datos</h3>
+            <pre id="formulaDisplay" class="text-sm text-gray-700 overflow-x-auto p-3 bg-white rounded-lg border"></pre>
+        </div>
+    </div>
+    <!-- FIN SECCIÓN DE FÓRMULA SOLICITADA -->
+
 </div>
 
 <script>
+    // Variables para almacenar el texto de las fórmulas
+    let lastFormulaDetails = "Realice un cálculo para ver las fórmulas utilizadas con sus datos.";
+
     // Datos de los modelos de impresora
     const PRINTER_DATA = {
         "BambuLab A1": {
             cost: 1360000.0,
             lifespan: 5000,
-            maintenance_rate: 10.0
+            maintenance_rate: 10.0,
+            consumption: 0.1 // kWh/h (User specified)
         },
         "Artillery X2": {
             cost: 600000.0,
             lifespan: 3000,
-            maintenance_rate: 10.0
+            maintenance_rate: 10.0,
+            consumption: 0.2 // kWh/h (~200W estimado)
         },
         "Ender S1 Pro": {
             cost: 400000.0,
             lifespan: 4000,
-            maintenance_rate: 10.0
+            maintenance_rate: 10.0,
+            consumption: 0.15 // kWh/h (~150W estimado)
         }
     };
 
@@ -241,7 +266,8 @@
         const inputs = [
             document.getElementById('machine_cost'),
             document.getElementById('machine_life_h'),
-            document.getElementById('maintenance_rate')
+            document.getElementById('maintenance_rate'),
+            document.getElementById('consumption_kwh_h') // INCLUIDO EN DETALLES
         ];
         
         // Alternar visibilidad
@@ -267,7 +293,26 @@
     }
 
     /**
-     * Actualiza los campos de costo, vida útil y mantenimiento de la máquina 
+     * Alterna la visibilidad de la fórmula y actualiza el texto del botón.
+     */
+    function toggleFormula() {
+        const formulaContent = document.getElementById('formulaContent');
+        const toggleBtn = document.getElementById('toggleFormulaBtn');
+        const formulaDisplay = document.getElementById('formulaDisplay');
+        const isHidden = formulaContent.classList.contains('hidden');
+
+        if (isHidden) {
+            formulaDisplay.textContent = lastFormulaDetails;
+            formulaContent.classList.remove('hidden');
+            toggleBtn.textContent = 'Ocultar Detalle de Fórmulas';
+        } else {
+            formulaContent.classList.add('hidden');
+            toggleBtn.textContent = 'Ver Detalle de Fórmulas';
+        }
+    }
+
+    /**
+     * Actualiza los campos de costo, vida útil, mantenimiento y consumo de la máquina 
      * basándose en la selección del dropdown 'Printer'.
      */
     function updatePrinterParams() {
@@ -276,12 +321,18 @@
         const detailsContainer = document.getElementById('printer_details_container');
 
         if (data) {
+            const machineCostInput = document.getElementById('machine_cost');
+            const machineLifeInput = document.getElementById('machine_life_h');
+            const maintenanceRateInput = document.getElementById('maintenance_rate');
+            const consumptionInput = document.getElementById('consumption_kwh_h'); // NUEVO INPUT
+
             // Solo actualiza los inputs si están en modo de solo lectura (o si están ocultos)
             // Si el usuario los está viendo y editando, no queremos sobreescribirlos.
-            if (document.getElementById('machine_cost').readOnly || detailsContainer.classList.contains('hidden')) {
-                document.getElementById('machine_cost').value = data.cost.toFixed(2);
-                document.getElementById('machine_life_h').value = data.lifespan;
-                document.getElementById('maintenance_rate').value = data.maintenance_rate.toFixed(1);
+            if (machineCostInput.readOnly || detailsContainer.classList.contains('hidden')) {
+                machineCostInput.value = data.cost.toFixed(2);
+                machineLifeInput.value = data.lifespan;
+                maintenanceRateInput.value = data.maintenance_rate.toFixed(1);
+                consumptionInput.value = data.consumption.toFixed(3); // Establece el consumo
             }
             
             // Forzamos el recálculo
@@ -298,7 +349,9 @@
         const filament_price_kg = getVal('filament_price_kg');
         const print_time_h = getVal('print_time_h');
         const electricity_cost = getVal('electricity_cost');
-        const consumption_kwh_h = getVal('consumption_kwh_h');
+        
+        // El consumo ahora se lee de la nueva ubicación en la sección de impresora
+        const consumption_kwh_h = getVal('consumption_kwh_h'); 
         
         // Parámetros de la impresora (se leen de los inputs que son actualizados por el dropdown o editados manualmente)
         const machine_cost = getVal('machine_cost');
@@ -327,6 +380,9 @@
         if (machine_life_h > 0) {
             machine_hour_cost = (machine_cost / machine_life_h) + 
                                 ((maintenance / 100) * machine_cost / machine_life_h);
+        } else {
+            // Manejo de error si la vida útil es 0
+            machine_hour_cost = 0;
         }
 
         // 4. Costo de Amortización de Máquina en esta Pieza
@@ -349,6 +405,70 @@
         // final_price = adjusted_cost * (1 + profit_margin / 100) + extras
         const final_price = adjusted_cost * (1 + profit_margin / 100) + extras;
 
+        // --- 9. Construcción de la Cadena de Fórmulas para la Sección Oculta ---
+
+        const formatedMaterialCost = formatCurrency(material_cost);
+        const formatedEnergyCost = formatCurrency(energy_cost);
+        const formatedMachinePart = formatCurrency(machine_cost_part);
+        const formatedLaborTotal = formatCurrency(labor_total);
+        const formatedSubtotal = formatCurrency(subtotal);
+        const formatedAdjustedCost = formatCurrency(adjusted_cost);
+        const formatedFinalPrice = formatCurrency(final_price);
+
+        lastFormulaDetails = `
+--- FÓRMULAS CON DATOS ---
+
+1. Costo de Material:
+   Fórmula: (Filamento Usado [g] / 1000) $\\times$ Precio Filamento [AR$/kg]
+   Datos: (${filament_g.toFixed(2)} g / 1000) $\\times$ ${formatCurrency(filament_price_kg)}/kg
+   Resultado: ${formatedMaterialCost}
+
+2. Costo de Energía:
+   Fórmula: Tiempo Impresión [h] $\\times$ Consumo [kWh/h] $\\times$ Precio Energía [AR$/kWh]
+   Datos: ${print_time_h.toFixed(2)} h $\\times$ ${consumption_kwh_h.toFixed(3)} kWh/h $\\times$ ${formatCurrency(electricity_cost)}/kWh
+   Resultado: ${formatedEnergyCost}
+
+3. Costo por Hora de Máquina (Amortización + Mantenimiento):
+   Fórmula: (Costo Máquina / Vida Útil [h]) + ((Tasa Mant. / 100) $\\times$ Costo Máquina / Vida Útil [h])
+   Datos: (${formatCurrency(machine_cost)} / ${machine_life_h.toFixed(0)} h) + ((${maintenance.toFixed(1)} / 100) $\\times$ ${formatCurrency(machine_cost)} / ${machine_life_h.toFixed(0)} h)
+   Resultado/Hora: ${formatCurrency(machine_hour_cost)}/h
+
+4. Costo de Amortización de Máquina en esta Pieza:
+   Fórmula: Tiempo Impresión [h] $\\times$ Costo por Hora de Máquina [AR$/h]
+   Datos: ${print_time_h.toFixed(2)} h $\\times$ ${formatCurrency(machine_hour_cost)}/h
+   Resultado: ${formatedMachinePart}
+
+5. Costo de Mano de Obra:
+   Fórmula: Tiempo Prep + Postproceso [h] $\\times$ Costo Laboral [AR$/h]
+   Datos: ${prep_time.toFixed(2)} h $\\times$ ${formatCurrency(labor_cost_h)}/h
+   Resultado: ${formatedLaborTotal}
+
+6. Subtotal (Costos Directos):
+   Fórmula: Material + Energía + Amortización Máquina + Laboral
+   Datos: ${formatedMaterialCost} + ${formatedEnergyCost} + ${formatedMachinePart} + ${formatedLaborTotal}
+   Resultado: ${formatedSubtotal}
+
+7. Costo Ajustado (incl. Tasa de Fallo):
+   Fórmula: Subtotal $\\times$ (1 + Tasa Fallo / 100)
+   Datos: ${formatedSubtotal} $\\times$ (1 + ${failure_rate.toFixed(1)} / 100)
+   Resultado: ${formatedAdjustedCost}
+
+8. Precio Final (incl. Margen + Extras):
+   Fórmula: Costo Ajustado $\\times$ (1 + Margen Beneficio / 100) + Extras
+   Datos: ${formatedAdjustedCost} $\\times$ (1 + ${profit_margin.toFixed(1)} / 100) + ${formatCurrency(extras)}
+   Resultado: ${formatedFinalPrice}
+`;
+        
+        // Mostrar la sección de fórmulas y asegurarse de que el contenido esté oculto inicialmente
+        const formulaSection = document.getElementById('formulaSection');
+        const formulaContent = document.getElementById('formulaContent');
+        const toggleBtn = document.getElementById('toggleFormulaBtn');
+
+        formulaSection.classList.remove('hidden');
+        formulaContent.classList.add('hidden');
+        toggleBtn.textContent = 'Ver Detalle de Fórmulas';
+
+
         // 💡 Actualización de Resultados en Pantalla
         document.getElementById('res_material_cost').textContent = formatCurrency(material_cost);
         document.getElementById('res_energy_cost').textContent = formatCurrency(energy_cost);
@@ -366,8 +486,9 @@
         
         // 2. Enlazar eventos de input para todos los campos editables y el dropdown
         document.querySelectorAll('.grid-container input[type="number"], #printer_model').forEach(element => {
-            // Excluimos los inputs de la máquina, ya que tienen su oninput en el HTML y su editabilidad es dinámica.
-            if (element.id !== 'machine_cost' && element.id !== 'machine_life_h' && element.id !== 'maintenance_rate') {
+            // Excluimos los 4 inputs de la máquina, ya que tienen su oninput en el HTML y su editabilidad es dinámica, 
+            // además de que sus valores se actualizan desde JS al cambiar el modelo.
+            if (element.id !== 'machine_cost' && element.id !== 'machine_life_h' && element.id !== 'maintenance_rate' && element.id !== 'consumption_kwh_h') {
                 element.addEventListener('input', calculateCost);
             }
         });
