@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RENVOX Crypto Radar — Lite</title>
+<title>RENVOX Crypto Radar — Lite (AllOrigins)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
@@ -12,7 +12,7 @@
 </head>
 <body class="p-6">
 <h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Lite</h1>
-<p class="text-gray-400 text-center mb-6">Análisis técnico básico (RSI, EMA, Fibonacci) directo desde CoinGecko<br>Sin backend • 3 tokens rotativos • 20 s refresco</p>
+<p class="text-gray-400 text-center mb-6">Usa proxy AllOrigins para evitar CORS<br>Analiza BTC, ETH y SOL con RSI, EMA y Fibonacci</p>
 
 <div class="overflow-x-auto border border-gray-700 rounded-xl">
 <table class="w-full text-sm text-center" id="table">
@@ -42,15 +42,19 @@ function ema(values,span){
 function rsi(values,period=14){
   let gains=0,losses=0;
   for(let i=1;i<=period;i++){const d=values[i]-values[i-1];if(d>=0)gains+=d;else losses-=d;}
-  let avgG=gains/period,avgL=losses/period;const out=[];
+  let avgG=gains/period,avgL=losses/period;
   for(let i=period+1;i<values.length;i++){
     const d=values[i]-values[i-1];const g=Math.max(d,0),l=Math.max(-d,0);
     avgG=(avgG*(period-1)+g)/period;avgL=(avgL*(period-1)+l)/period;
-    const rs=avgL===0?100:avgG/avgL;out.push(100-(100/(1+rs)));
-  }return out.at(-1);
+  }
+  const rs=avgL===0?100:avgG/avgL;
+  return 100-(100/(1+rs));
 }
+
 async function analyze(id){
-  const r=await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=30&interval=hourly`);
+  const apiUrl=`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=30&interval=hourly`;
+  const proxy=`https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
+  const r=await fetch(proxy);
   const data=await r.json();
   const closes=data.prices.map(p=>p[1]);
   const price=closes.at(-1);
@@ -89,13 +93,15 @@ async function render(){
     rows.innerHTML=`<tr><td colspan='6' class='p-4 text-red-400'>Error ${e.message}</td></tr>`;
   }
   idx++;
-  if(idx%coins.length!==0) setTimeout(render,4000);
-  else setTimeout(()=>{idx=0;render();},20000);
+  if(idx%coins.length!==0) setTimeout(render,6000);
+  else setTimeout(()=>{idx=0;render();},25000);
 }
 render();
 </script>
 
-<p class="text-xs text-gray-500 mt-4">Calcula RSI14, EMA20/50 y niveles Fibonacci (últimos 14 d). 
-Señales orientativas, no constituyen recomendación financiera.</p>
+<p class="text-xs text-gray-500 mt-4 text-center">
+Calcula RSI14, EMA20/50 y niveles Fibonacci (últimos 14 d) usando CoinGecko vía proxy AllOrigins.<br>
+Sin backend, apto para GitHub Pages. No constituye asesoramiento financiero.
+</p>
 </body>
 </html>
