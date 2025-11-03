@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RENVOX Crypto Radar — Binance v3.5</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
+  a.btn{background:#16a34a;color:white;padding:.25rem .6rem;border-radius:.5rem;font-weight:600;transition:all .2s}
+  a.btn:hover{background:#22c55e}
+  tr.highlight-green{background-color:#064e3b !important;}
+  tr.highlight-blue{background-color:#0c4a6e !important;}
+  tr.highlight-yellow{background-color:#78350f !important;}
+  .muted{color:#94a3b8}
+</style>
+</head>
+<body class="p-6">
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v3.5</h1>
+<p class="text-gray-400 text-center mb-6">
+RSI · EMA20/50 · Fibonacci (14d) + riesgo estimado y <b>targets 1.272 / 1.618</b> con upside potencial.<br>
+Actualiza automáticamente cada 1 hora.
+</p>
+
+<div class="overflow-x-auto border border-gray-700 rounded-xl">
+<table class="w-full text-sm text-center" id="table">
+  <thead class="bg-gray-800 text-gray-300">
+    <tr>
+      <th class="py-2">Token</th>
+      <th class="py-2">Precio</th>
+      <th class="py-2">RSI14</th>
+      <th class="py-2">EMA20/50</th>
+      <th class="py-2">Zona Fibo</th>
+      <th class="py-2">Señal</th>
+      <th class="py-2">Riesgo</th>
+      <th class="py-2">🎯 Targets (1.272 / 1.618)</th>
+      <th class="py-2">📈 Upside</th>
+      <th class="py-2">Motivo</th>
+      <th class="py-2">Gráfico</th>
+    </tr>
+  </thead>
+  <tbody id="rows" class="bg-gray-900"></tbody>
+</table>
+</div>
+
+<script>
+const pairs=["BTCUSDT","ETHUSDT","SOLUSDT","AVAXUSDT","LINKUSDT","INJUSDT"];
+const REFRESH_INTERVAL=3600000; // 1h
+
+function ema(values,span){
+  const k=2/(span+1);let emaArr=[values[0]];let prev=values[0];
+  for(let i=1;i<values.length;i++){prev=values[i]*k+prev*(1-k);emaArr.push(prev);}
+  return emaArr;
+}
+function rsi(values,period=14){
+  let gains=0,losses=0;
+  for(let i=1;i<=period;i++){const d=values[i]-values[i-1];if(d>=0)gains+=d;else losses-=d;}
+  let avgG=gains/period,avgL=losses/period;
+  for(let i=period+1;i<values.length;i++){
+    const d=values[i]-values[i-1];const g=Math.max(d,0),l=Math.max(-d,0);
+    avgG=(avgG*(period-1)+g)/period;avgL=(avgL*(period-1)+l)/period;
+  }
+  const rs=avgL===0?100:avgG/avgL;
+  return 100-(100/(1+rs));
+}
+function linkGrafico(symbol){
+  const base=symbol.replace("USDT","");
+  return `https://www.tradingview.com/symbols/${base}USDT/`;
+}
+function motivo(signal){
+  if(signal.includes("Pullback leve")) return "RSI medio en recuperación; posible rebote.";
+  if(signal.includes("Pullback")) return "Rebote confirmado en zona Fibo.";
+  if(signal.includes("Breakout")) return "Rompió resistencia; momentum alcista.";
+  if(signal.includes("Caliente")) return "Extensión; riesgo de toma de ganancias.";
+  return "Esperar confirmación técnica o volumen.";
+}
+function riesgo(rsi,emaGap){
+  if(rsi<45 && emaGap<2) return {txt:"🟩 Bajo",class:"text-green-400"};
+  if(rsi>65 || emaGap>4) return {txt:"🟥 Alto",class:"text-red-400"};
+  return {txt:"🟨 Medio",class:"text-yellow-400"};
+}
+function fmt(n){return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:2}):"-";}
+
+async function analyze(symbol){
+  const url=`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=500`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data=await r.json();
+  if(!Array.isArray(data)||data.length===0) throw new Error(`Datos inválidos (${symbol})`);
+
+  const closes=data.map(k=>parseFloat(k[4]));
+  const price=closes.at(-1);
+
+  // Técnicos
+  const ema20=ema(closes,20).at(-1);
+  const ema50=ema(closes,50).at(-1);
+  const rsi14=rsi(closes,14);
+
+  // Swing 14 días (24h*14 = 336 velas de 1h)
+  const last336 = closes.slice(-336);
+  const max14 = Math.max(...last336);
+  const min14 = Math.min(...last336);
+  const range = max14 - min14;
+
+  // Niveles Fibo de retroceso (zona de compra)
+  const fib50 = min14 + 0.5*range;
+  const fib618 = min14 + 0.618*range;
+  const inZone = price>=fib50 && price<=fib618;
+
+  // Extensiones de objetivos (bullish): low + factor*range
+  const t1272 = min14 + 1.272*range;
+  const t1618 = min14 + 1.618*range;
+
+  // Señales
+  const trendUp = ema20>ema50;
+  let signal="⚪ Mirar",color="text-gray-300",rowClass="";
+  if(inZone && trendUp && rsi14>=50 && rsi14<=65){
+    signal="🟢 Pullback"; color="text-green-400"; rowClass="highlight-green";
+  } else if(inZone && rsi14>=40 && rsi14<=70){
+    signal="🟡 Pullback leve"; color="text-yellow-400"; rowClass="highlight-yellow";
+  } else if(price>max14 && trendUp && rsi14>60){
+    signal="🔵 Breakout"; color="text-cyan-400"; rowClass="highlight-blue";
+  } else if(rsi14>70){
+    signal="🔴 Caliente"; color="text-red-400";
+  }
+
+  const emaGap = Math.abs(ema20-ema50)/((ema20+ema50)/2)*100;
+  const risk = riesgo(rsi14,emaGap);
+
+  // Upside potencial (%)
+  const up1 = ((t1272 - price)/price)*100;
+  const up2 = ((t1618 - price)/price)*100;
+
+  const chart=linkGrafico(symbol);
+
+  return `
+    <tr class='border-b border-gray-800 ${rowClass}'>
+      <td class='py-2 font-semibold'>${symbol}</td>
+      <td>$${fmt(price)}</td>
+      <td>${fmt(rsi14)}</td>
+      <td>${fmt(ema20)} / ${fmt(ema50)}</td>
+      <td>${fmt(fib50)}–${fmt(fib618)}</td>
+      <td class='${color} font-bold'>${signal}</td>
+      <td class='${risk.class} font-semibold'>${risk.txt}</td>
+      <td>
+        <div>${fmt(t1272)} <span class="muted">(1.272)</span></div>
+        <div>${fmt(t1618)} <span class="muted">(1.618)</span></div>
+      </td>
+      <td>
+        <div class='${up1>0?"text-green-400":"text-gray-400"}'>${up1>0?`+${fmt(up1)}%`:`${fmt(up1)}%`}</div>
+        <div class='${up2>0?"text-green-400":"text-gray-400"}'>${up2>0?`+${fmt(up2)}%`:`${fmt(up2)}%`}</div>
+      </td>
+      <td class='text-gray-300 text-sm'>${motivo(signal)}</td>
+      <td><a href='${chart}' target='_blank' class='btn'>Ver gráfico</a></td>
+    </tr>`;
+}
+
+async function render(){
+  const rows=document.getElementById('rows');
+  rows.innerHTML=`<tr><td colspan='11' class='p-4 text-gray-400'>Cargando datos desde Binance...</td></tr>`;
+  const promises=pairs.map(async p=>{
+    try { return await analyze(p); }
+    catch(e){ console.warn("Error",p,e);
+      return `<tr class='border-b border-gray-800 text-red-400'><td colspan='11'>Error ${p}: ${e.message}</td></tr>`;
+    }
+  });
+  const results = await Promise.allSettled(promises);
+  rows.innerHTML = results.map(r=>r.value||'').join('');
+  console.log("✅ Actualización:", new Date().toLocaleTimeString());
+  setTimeout(render, REFRESH_INTERVAL);
+}
+render();
+</script>
+
+<p class="text-xs text-gray-500 mt-4 text-center">
+v3.5 — Añade objetivos Fibonacci 1.272/1.618 y upside vs. precio actual.  
+Extensiones calculadas sobre swing 14d: <i>low + factor × (high − low)</i>.  
+Señales: 🟢 Pullback confirmado • 🟡 Pullback leve • 🔵 Breakout • 🔴 Caliente • ⚪ Mirar.  
+Riesgo: 🟩 Bajo • 🟨 Medio • 🟥 Alto. Datos Binance 1h (500 velas). No es asesoramiento financiero.
+</p>
+</body>
+</html>
