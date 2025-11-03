@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>RENVOX Crypto Radar — Binance v4.2 - Filtrado 10-40%</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
+  a.btn{background:#16a34a;color:#fff;padding:.25rem .6rem;border-radius:.5rem;font-weight:600;transition:all .2s}
+  a.btn:hover{background:#22c55e}
+  th,td{text-align:right;padding:.55rem .75rem}
+  th:first-child,td:first-child{text-align:left}
+  .muted{color:#94a3b8}
+  .cat-header{background:#1f2937;color:#93c5fd;font-weight:700;cursor:pointer;user-select:none}
+  .cat-header .arrow{transition:transform .2s}
+  .collapsed .arrow{transform:rotate(-90deg)}
+  tr.highlight-green{background:#064e3b!important}
+  tr.highlight-blue{background:#0c4a6e!important}
+  tr.highlight-yellow{background:#78350f!important}
+  .chip{padding:.15rem .45rem;border-radius:.5rem}
+</style>
+</head>
+<body class="p-6">
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v4.2</h1>
+<p class="text-gray-400 text-center mb-6">
+RSI · EMA20/50 · Fibonacci (21d) · 🎯 Targets 1.272/1.618 (Filtro **10% a 40% Upside**) · 🛟 Stop · ⚖️ RR · Sparkline 7d · categorías colapsables.<br/>
+Fuente principal: Binance klines 1h • Fallback: CoinGecko. Refresca cada 1 hora.
+</p>
+
+<div class="overflow-x-auto border border-gray-700 rounded-xl">
+  <table class="w-full text-xs md:text-sm" id="table">
+    <thead class="bg-gray-800 text-gray-300">
+      <tr>
+        <th>Token</th>
+        <th>Precio</th>
+        <th>RSI14</th>
+        <th>EMA20/50</th>
+        <th>Zona Fibo</th>
+        <th>Señal</th>
+        <th>Riesgo</th>
+        <th>🎯 Targets</th>
+        <th>📈 Upside</th>
+        <th>🛟 Stop</th>
+        <th>⚖️ RR</th>
+        <th style="text-align:center">Spark</th>
+        <th>Gráfico</th>
+      </tr>
+    </thead>
+    <tbody id="rows" class="bg-gray-900"></tbody>
+  </table>
+</div>
+
+<script>
+/* =============== CONFIG =============== */
+const REFRESH_INTERVAL = 3600000; // 1h
+const CACHE_KEY = "renvox_v42_rows";
+
+/* Categorías y tokens (pares USDT) */
+const CATEGORIES = {
+  "🤖 Inteligencia Artificial": ["RNDRUSDT","FETUSDT","GRTUSDT","OCEANUSDT","AGIXUSDT","TAOUSDT"],
+  "⚡ Energía / Baterías / IoT": ["NEOUSDT","IOTAUSDT","ICPUSDT","NKNUSDT","POWRUSDT","EWTUSDT"],
+  "🏗️ Infraestructura / Oráculos": ["LINKUSDT","INJUSDT","ARBUSDT","OPUSDT","AVAXUSDT","ATOMUSDT"],
+  "💰 Mainstream": ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","ADAUSDT","DOTUSDT"],
+  "🌐 Web3 emergentes": ["TIAUSDT","PYTHUSDT","ALTUSDT","SEIUSDT","JTOUSDT"]
+};
+
+/* Mapeo a IDs de CoinGecko para fallback */
+const CG_IDS = {
+  RNDR:"render-token", FET:"fetch-ai", GRT:"the-graph", OCEAN:"ocean-protocol", AGIX:"singularitynet", TAO:"bittensor",
+  NEO:"neo", IOTA:"iota", ICP:"internet-computer", NKN:"nkn", POWR:"power-ledger", EWT:"energy-web-token",
+  LINK:"chainlink", INJ:"injective-protocol", ARB:"arbitrum", OP:"optimism", AVAX:"avalanche-2", ATOM:"cosmos",
+  BTC:"bitcoin", ETH:"ethereum", SOL:"solana", BNB:"binancecoin", ADA:"cardano", DOT:"polkadot",
+  TIA:"celestia", PYTH:"pyth-network", ALT:"altlayer", SEI:"sei-network", JTO:"jito"
+};
+
+/* =============== UTILS =============== */
+const fmt=(n,fd=2)=>Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:fd}):"-";
+const pct=(v)=>Number.isFinite(v)?(v>=0?`+${fmt(v,2)}%`:`${fmt(v,2)}%`):"-";
+function average(arr){if(!arr.length) return 0; return arr.reduce((a,b)=>a+b,0)/arr.length;}
+
+/* EMA & RSI */
+function ema(values,span){
+  const k=2/(span+1); let prev=values[0], out=[prev];
+  for(let i=1;i<values.length;i++){prev=values[i]*k + prev*(1-k); out.push(prev);}
+  return out;
+}
+function rsi(values,period=14){
+  let g=0,l=0;
+  for(let i=1;i<=period;i++){const d=values[i]-values[i-1]; if(d>=0) g+=d; else l-=d;}
+  let ag=g/period, al=l/period;
+  for(let i=period+1;i<values.length;i++){
+    const d=values[i]-values[i-1], gain=Math.max(d,0), loss=Math.max(-d,0);
+    ag=(ag*(period-1)+gain)/period; al=(al*(period-1)+loss)/period;
+  }
+  const rs = al===0?100:ag/al;
+  return 100-(100/(1+rs));
+}
+
+/* Sparkline simple (últimos 7 días ~168 datos 1h) */
+function sparkSVG(series,w=86,h=26,m=2){
+  const data = series.slice(-168);
+  if(data.length<2) return "";
+  const min=Math.min(...data), max=Math.max(...data), rng=(max-min)||1;
+  const W=w-2*m,H=h-2*m;
+  const pts = data.map((v,i)=>{
+    const x=m + i*(W/(data.length-1));
+    const y=m + H - ((v-min)/rng)*H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const up = data[data.length-1]>=data[0];
+  const stroke = up ? "#22c55e" : "#60a5fa";
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <polyline fill="none" stroke="${stroke}" stroke-width="1.5" points="${pts}" />
+  </svg>`;
+}
+
+/* Señal, riesgo y ranking */
+function riskBadge(rsi,emaGap){
+  if(rsi<45 && emaGap<2) return {txt:"🟩 Bajo", cls:"text-green-400"};
+  if(rsi>65 || emaGap>4)  return {txt:"🟥 Alto", cls:"text-red-400"};
+  return {txt:"🟨 Medio", cls:"text-yellow-400"};
+}
+function signalFrom(price, max14, inZone, trendUp, rsi){
+  if(inZone && trendUp && rsi>=50 && rsi<=65) return {txt:"🟢 Pullback", color:"text-green-400", row:"highlight-green"};
+  if(inZone && rsi>=40 && rsi<=70)           return {txt:"🟡 Pullback leve", color:"text-yellow-400", row:"highlight-yellow"};
+  if(price > max14 && trendUp && rsi>60)     return {txt:"🔵 Breakout", color:"text-cyan-400", row:"highlight-blue"};
+  if(rsi>70)                                  return {txt:"🔴 Caliente", color:"text-red-400", row:""};
+  return {txt:"⚪ Mirar", color:"text-gray-300", row:""};
+}
+function rankScore(sigTxt, riskTxt, up1, volScore){
+  let s=0;
+  if(sigTxt.includes("Pullback")) s+=5;
+  if(sigTxt.includes("leve"))     s+=3;
+  if(sigTxt.includes("Breakout")) s+=2;
+  if(riskTxt.includes("Bajo"))    s+=1;
+  if(up1>0)                       s+=1;
+  return s + (volScore||0); // empujoncito por volumen
+}
+
+/* TradingView link */
+function tvLink(symbol){const base=symbol.replace("USDT",""); return `https://www.tradingview.com/symbols/${base}USDT/`;}
+
+/* =============== DATA FETCHERS =============== */
+async function fetchBinance(symbol){
+  const url=`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=500`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error(`Binance HTTP ${r.status}`);
+  const data=await r.json();
+  if(!Array.isArray(data)||!data.length) throw new Error("Binance data vacío");
+  const closes = data.map(k=>parseFloat(k[4]));
+  const vols   = data.map(k=>parseFloat(k[5]||0)); // base asset volume
+  return {closes, volumeHint: average(vols.slice(-168))};
+}
+async function fetchCoinGecko(symbol){
+  const base = symbol.replace("USDT","");
+  const id = CG_IDS[base];
+  if(!id) throw new Error("Sin mapeo CoinGecko para "+base);
+  const url=`https://www.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=21&interval=hourly`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error(`CG HTTP ${r.status}`);
+  const j=await r.json();
+  if(!j.prices || !j.prices.length) throw new Error("CG data vacío");
+  const closes = j.prices.map(p=>p[1]);
+  return {closes, volumeHint: 0}; // CG: sin volumen por vela en este endpoint
+}
+
+
+/* =============== CORE ANALYSIS (MODIFICADO para filtro 10-40%) =============== */
+async function analyze(symbol){
+  let closes, volumeHint=0;
+  try { ({closes,volumeHint} = await fetchBinance(symbol)); }
+  catch(e){
+    console.warn(symbol,"Binance fallo -> CG fallback:",e?.message||e);
+    ({closes,volumeHint} = await fetchCoinGecko(symbol));
+  }
+  if(!closes || closes.length<60) throw new Error("Serie insuficiente");
+
+  const price = closes.at(-1);
+  const ema20 = ema(closes,20).at(-1);
+  const ema50 = ema(closes,50).at(-1);
+  const rsi14 = rsi(closes,14);
+
+  // Swing 21d (500 velas 1h) - Ajustado para mejor rango Fibo (antes era 336/14d)
+  const last500 = closes.slice(-500);
+  const max14 = Math.max(...last500);
+  const min14 = Math.min(...last500);
+  const range = (max14 - min14) || 1;
+
+  // Retrocesos (zona compra) + Extensiones (targets)
+  const fib50 = min14 + 0.5*range;
+  const fib618 = min14 + 0.618*range;
+  const inZone = price>=fib50 && price<=fib618;
+  const t1272 = min14 + 1.272*range;
+  const t1618 = min14 + 1.618*range;
+
+  // Señal, riesgo, ranking
+  const trendUp = ema20 > ema50;
+  const sig = signalFrom(price,max14,inZone,trendUp,rsi14);
+  const emaGap = Math.abs(ema20-ema50)/((ema20+ema50)/2)*100;
+  const risk = riskBadge(rsi14,emaGap);
+  const up1 = ((t1272 - price)/price)*100;
+  const up2 = ((t1618 - price)/price)*100;
+  const stop = Math.min(fib618, ema50) * 0.995; // colchón -0.5%
+  const riskAbs = Math.max(price - stop, 0.0000001);
+  const rr1 = (t1272 - price)/riskAbs;
+  const rr2 = (t1618 - price)/riskAbs;
+
+  // === IMPLEMENTACIÓN DEL FILTRO DE UPSIDE (10% - 40%) ===
+  const MIN_UPSIDE = 10;
+  const MAX_UPSIDE = 40;
+
+  const meetsUpside1 = up1 >= MIN_UPSIDE && up1 <= MAX_UPSIDE;
+  const meetsUpside2 = up2 >= MIN_UPSIDE && up2 <= MAX_UPSIDE;
+
+  // Descartar si ningún target cumple el rango de ganancia (10-40%)
+  if (!meetsUpside1 && !meetsUpside2) {
+    throw new Error(`Upside ${pct(up1)}/${pct(up2)} fuera de rango ${MIN_UPSIDE}%-${MAX_UPSIDE}%`);
+  }
+
+  // Ranking simple ponderando volumen
+  const volScore = volumeHint ? Math.tanh(volumeHint) : 0; // normaliza 0..1
+  const rank = rankScore(sig.txt, risk.txt, up1, volScore);
+
+  return {
+    symbol, price, rsi14, ema20, ema50, fib50, fib618, t1272, t1618,
+    up1, up2, stop, rr1, rr2, closes, signal:sig.txt, signalColor:sig.color,
+    rowClass:sig.row, risk, rank
+  };
+}
+
+/* =============== RENDER (MODIFICADO para manejar los filtros) =============== */
+function rowHTML(o){
+  return `
+  <tr class="border-b border-gray-800 ${o.rowClass}">
+    <td>${o.symbol}</td>
+    <td>$${fmt(o.price)}</td>
+    <td>${fmt(o.rsi14)}</td>
+    <td>${fmt(o.ema20)} / ${fmt(o.ema50)}</td>
+    <td>${fmt(o.fib50)}–${fmt(o.fib618)}</td>
+    <td class="${o.signalColor} font-bold">${o.signal}</td>
+    <td class="${o.risk.cls} font-semibold">${o.risk.txt}</td>
+    <td>
+      <div>${fmt(o.t1272)} <span class="muted">(1.272)</span></div>
+      <div>${fmt(o.t1618)} <span class="muted">(1.618)</span></div>
+    </td>
+    <td>
+      <div class="${o.up1>0?'text-green-400':'text-gray-400'}">${pct(o.up1)}</div>
+      <div class="${o.up2>0?'text-green-400':'text-gray-400'}">${pct(o.up2)}</div>
+    </td>
+    <td>$${fmt(o.stop)}</td>
+    <td>
+      <div class="${o.rr1>=2?'text-green-400':(o.rr1>=1?'text-yellow-400':'text-red-400')}">T1: ${fmt(o.rr1,2)}x</div>
+      <div class="${o.rr2>=2?'text-green-400':(o.rr2>=1?'text-yellow-400':'text-red-400')}">T2: ${fmt(o.rr2,2)}x</div>
+    </td>
+    <td style="text-align:center">${sparkSVG(o.closes)}</td>
+    <td><a class="btn" target="_blank" href="${tvLink(o.symbol)}">Ver</a></td>
+  </tr>`;
+}
+
+function catHeaderHTML(cat, open=true){
+  return `
+  <tr class="cat-header ${open?'':'collapsed'}" data-cat="${cat}">
+    <td colspan="13"><span class="arrow">▾</span> ${cat}</td>
+  </tr>`;
+}
+
+async function render(){
+  const tbody = document.getElementById("rows");
+
+  // pintar cache si existe
+  const cached = localStorage.getItem(CACHE_KEY);
+  if(cached) tbody.innerHTML = cached;
+  if(!cached) tbody.innerHTML = `<tr><td colspan="13" class="p-4 text-gray-400">Cargando datos...</td></tr>`;
+
+  let html = "";
+
+  for (const [cat, tokens] of Object.entries(CATEGORIES)) {
+    html += catHeaderHTML(cat, true);
+    // fetch en paralelo por categoría
+    const results = await Promise.allSettled(tokens.map(analyze));
+
+    // FILTRAR: Solo tomamos las que cumplen el criterio (status="fulfilled")
+    const fulfilledRows = results
+      .filter(r => r.status==="fulfilled")
+      .map(r => r.value)
+      .sort((a,b)=> b.rank - a.rank);
+
+    const rows = fulfilledRows
+      .map(rowHTML)
+      .join("");
+
+    // Mensajes: Errores graves de API/datos y resumen de tokens filtrados
+    // Identificamos errores de la API (problemas de conexión o data)
+    const apiErrors = results
+      .filter(r => r.status==="rejected" && (String(r.reason).includes("HTTP") || String(r.reason).includes("data vacío") || String(r.reason).includes("insuficiente")))
+      .map((r)=> `<tr class="border-b border-gray-800 text-red-400"><td colspan="13">Error de datos: ${r.reason?.message || "Desconocido"}</td></tr>`)
+      .join("");
+
+    // Contamos los tokens filtrados por la regla de Upside
+    const filteredTokensCount = results.filter(r => r.status==="rejected" && String(r.reason).includes("Upside")).length;
+
+    const filterSummary = filteredTokensCount > 0
+      ? `<tr class="border-b border-gray-800 text-yellow-400"><td colspan="13">${filteredTokensCount} tokens filtrados (Upside < 10% o > 40%).</td></tr>`
+      : "";
+
+    html += rows + filterSummary + apiErrors;
+  }
+
+  tbody.innerHTML = html;
+  localStorage.setItem(CACHE_KEY, html);
+  attachCollapsers();
+  console.log("✅ Actualización:", new Date().toLocaleTimeString());
+  setTimeout(render, REFRESH_INTERVAL);
+}
+
+/* Colapsar/expandir categorías */
+function attachCollapsers(){
+  const tbody = document.getElementById("rows");
+  const headers = tbody.querySelectorAll(".cat-header");
+  headers.forEach(h=>{
+    const cat = h.getAttribute("data-cat");
+    h.addEventListener("click", ()=>{
+      let row = h.nextElementSibling;
+      const collapsed = h.classList.toggle("collapsed");
+      while(row && !row.classList.contains("cat-header")){
+        row.style.display = collapsed ? "none" : "";
+        row = row.nextElementSibling;
+      }
+    });
+    // Símbolo de flecha correcto
+    const arrow = h.querySelector(".arrow");
+    if(arrow){ arrow.textContent = "▾"; }
+  });
+}
+
+/* start */
+render();
+</script>
+
+<p class="text-xs text-gray-500 mt-4 text-center">
+v4.2 (Modificado) — Pares activos y líquidos, Binance 1h con fallback CoinGecko, ranking por cercanía de entrada, categorías colapsables, cache local.<br/>
+**Filtro Activo:** Solo muestra tokens con Upside potencial entre 10% y 40% a Targets Fibonacci (1.272 o 1.618).
+No constituye asesoramiento financiero. Operar con gestión de riesgo.
+</p>
+</body>
+</html>
