@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RENVOX Crypto Radar — Binance v3.3</title>
+<title>RENVOX Crypto Radar — Binance v3.4</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
@@ -12,13 +12,14 @@
   a.btn:hover{background:#22c55e}
   tr.highlight-green{background-color:#064e3b !important;}
   tr.highlight-blue{background-color:#0c4a6e !important;}
+  tr.highlight-yellow{background-color:#78350f !important;}
 </style>
 </head>
 <body class="p-6">
-<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v3.3</h1>
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v3.4</h1>
 <p class="text-gray-400 text-center mb-6">
-Datos directos desde Binance API (velas 1h). RSI14 · EMA20/50 · Fibonacci (14d).<br>
-Actualiza automáticamente cada 1 hora. Destaca tokens con entrada técnica potencial.
+RSI · EMA20/50 · Fibonacci (14d) + clasificación extendida y riesgo estimado.<br>
+Refresca automáticamente cada 1 hora.
 </p>
 
 <div class="overflow-x-auto border border-gray-700 rounded-xl">
@@ -31,6 +32,7 @@ Actualiza automáticamente cada 1 hora. Destaca tokens con entrada técnica pote
       <th class="py-2">EMA20/50</th>
       <th class="py-2">Zona Fibo</th>
       <th class="py-2">Señal</th>
+      <th class="py-2">Riesgo</th>
       <th class="py-2">Motivo</th>
       <th class="py-2">Gráfico</th>
     </tr>
@@ -41,7 +43,7 @@ Actualiza automáticamente cada 1 hora. Destaca tokens con entrada técnica pote
 
 <script>
 const pairs=["BTCUSDT","ETHUSDT","SOLUSDT","AVAXUSDT","LINKUSDT","INJUSDT"];
-const REFRESH_INTERVAL=3600000; // 1 hora
+const REFRESH_INTERVAL=3600000; // 1h
 
 function ema(values,span){
   const k=2/(span+1);let emaArr=[values[0]];let prev=values[0];
@@ -59,18 +61,20 @@ function rsi(values,period=14){
   const rs=avgL===0?100:avgG/avgL;
   return 100-(100/(1+rs));
 }
-
-function motivo(signal,rsi){
-  if(signal.includes("Pullback")) return "Zona de retroceso técnico, posible rebote alcista.";
-  if(signal.includes("Breakout")) return "Rompió resistencia, momentum positivo.";
-  if(rsi<40) return "Sobreventa moderada, esperar confirmación.";
-  if(rsi>70) return "RSI alto, riesgo de corrección.";
-  return "Tendencia lateral, sin señal clara.";
-}
-
 function linkGrafico(symbol){
   const base=symbol.replace("USDT","");
   return `https://www.tradingview.com/symbols/${base}USDT/`;
+}
+function motivo(signal){
+  if(signal.includes("Pullback leve")) return "RSI medio en recuperación, podría iniciar rebote.";
+  if(signal.includes("Pullback")) return "Rebote técnico confirmado, buena zona de entrada.";
+  if(signal.includes("Breakout")) return "Rompió resistencia, momentum alcista.";
+  return "Esperar confirmación técnica o volumen.";
+}
+function riesgo(rsi,emaGap){
+  if(rsi<45 && emaGap<2) return {txt:"🟩 Bajo",class:"text-green-400"};
+  if(rsi>65 || emaGap>4) return {txt:"🟥 Alto",class:"text-red-400"};
+  return {txt:"🟨 Medio",class:"text-yellow-400"};
 }
 
 async function analyze(symbol){
@@ -91,13 +95,22 @@ async function analyze(symbol){
   const fib618=min+0.618*(max-min);
   const inZone=price>=fib50&&price<=fib618;
   const trendUp=ema20>ema50;
+  const emaGap=Math.abs(ema20-ema50)/((ema20+ema50)/2)*100;
 
   let signal="⚪ Mirar",color="text-gray-300",rowClass="";
-  if(inZone&&trendUp&&rsi14>=50&&rsi14<=65){signal="🟢 Pullback";color="text-green-400";rowClass="highlight-green";}
-  else if(price>max&&trendUp&&rsi14>60){signal="🔵 Breakout";color="text-cyan-400";rowClass="highlight-blue";}
-  else if(rsi14>70){signal="🔴 Caliente";color="text-red-400";}
+  if(inZone&&trendUp&&rsi14>=50&&rsi14<=65){
+    signal="🟢 Pullback";
+    color="text-green-400";rowClass="highlight-green";
+  } else if(inZone&&rsi14>=40&&rsi14<=70){
+    signal="🟡 Pullback leve";
+    color="text-yellow-400";rowClass="highlight-yellow";
+  } else if(price>max&&trendUp&&rsi14>60){
+    signal="🔵 Breakout";
+    color="text-cyan-400";rowClass="highlight-blue";
+  }
 
-  const desc=motivo(signal,rsi14);
+  const desc=motivo(signal);
+  const risk=riesgo(rsi14,emaGap);
   const chart=linkGrafico(symbol);
 
   return `
@@ -108,6 +121,7 @@ async function analyze(symbol){
       <td>${ema20.toFixed(1)} / ${ema50.toFixed(1)}</td>
       <td>${fib50.toFixed(1)}–${fib618.toFixed(1)}</td>
       <td class='${color} font-bold'>${signal}</td>
+      <td class='${risk.class} font-semibold'>${risk.txt}</td>
       <td class='text-gray-300 text-sm'>${desc}</td>
       <td><a href='${chart}' target='_blank' class='btn'>Ver gráfico</a></td>
     </tr>`;
@@ -115,13 +129,13 @@ async function analyze(symbol){
 
 async function render(){
   const rows=document.getElementById('rows');
-  rows.innerHTML=`<tr><td colspan='8' class='p-4 text-gray-400'>Cargando datos desde Binance...</td></tr>`;
+  rows.innerHTML=`<tr><td colspan='9' class='p-4 text-gray-400'>Cargando datos desde Binance...</td></tr>`;
   
   const promises=pairs.map(async(p)=>{
     try{return await analyze(p);}
     catch(e){
       console.warn("Error",p,e);
-      return `<tr class='border-b border-gray-800 text-red-400'><td colspan='8'>Error ${p}: ${e.message}</td></tr>`;
+      return `<tr class='border-b border-gray-800 text-red-400'><td colspan='9'>Error ${p}: ${e.message}</td></tr>`;
     }
   });
 
@@ -135,9 +149,9 @@ render();
 </script>
 
 <p class="text-xs text-gray-500 mt-4 text-center">
-v3.3 — Seis tokens, colores por oportunidad, y botón a gráfico en TradingView.<br>
-Datos en vivo desde Binance API (1h velas, 500 registros). Calcula RSI14, EMA20/50 y niveles Fibonacci (14d).<br>
-🟢 Pullback = posible rebote técnico • 🔵 Breakout = impulso confirmado.
+v3.4 — Incluye categoría “Pullback leve” (RSI 40–70) y evaluación de riesgo (RSI + EMA Gap).<br>
+🟢 Pullback confirmado • 🟡 Pullback leve • 🔵 Breakout • ⚪ Mirar<br>
+Riesgo: 🟩 Bajo • 🟨 Medio • 🟥 Alto
 </p>
 </body>
 </html>
