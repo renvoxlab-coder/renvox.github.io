@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>RENVOX Crypto Radar — Binance v4.2 - Filtrado 10-40%</title>
+<title>RENVOX Crypto Radar — Binance v4.3 - Filtrado Táctico</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
@@ -22,9 +22,10 @@
 </style>
 </head>
 <body class="p-6">
-<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v4.2</h1>
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v4.3</h1>
 <p class="text-gray-400 text-center mb-6">
-RSI · EMA20/50 · Fibonacci (21d) · 🎯 Targets 1.272/1.618 (Filtro **10% a 40% Upside**) · 🛟 Stop · ⚖️ RR · Sparkline 7d · categorías colapsables.<br/>
+RSI · EMA20/50 · Fibonacci (**21d**) · 🎯 Targets 1.272/1.618.<br/>
+**FILTROS ACTIVOS:** Upside **$10\%$ a $40\%$** **Y** RR **$\ge 2.0x$** (para al menos T1 o T2).<br/>
 Fuente principal: Binance klines 1h • Fallback: CoinGecko. Refresca cada 1 hora.
 </p>
 
@@ -54,7 +55,7 @@ Fuente principal: Binance klines 1h • Fallback: CoinGecko. Refresca cada 1 hor
 <script>
 /* =============== CONFIG =============== */
 const REFRESH_INTERVAL = 3600000; // 1h
-const CACHE_KEY = "renvox_v42_rows";
+const CACHE_KEY = "renvox_v43_rows";
 
 /* Categorías y tokens (pares USDT) */
 const CATEGORIES = {
@@ -166,7 +167,7 @@ async function fetchCoinGecko(symbol){
 }
 
 
-/* =============== CORE ANALYSIS (MODIFICADO para filtro 10-40%) =============== */
+/* =============== CORE ANALYSIS (FILTROS RR >= 2.0x y Upside 10-40%) =============== */
 async function analyze(symbol){
   let closes, volumeHint=0;
   try { ({closes,volumeHint} = await fetchBinance(symbol)); }
@@ -181,7 +182,7 @@ async function analyze(symbol){
   const ema50 = ema(closes,50).at(-1);
   const rsi14 = rsi(closes,14);
 
-  // Swing 21d (500 velas 1h) - Ajustado para mejor rango Fibo (antes era 336/14d)
+  // Swing 21d (500 velas 1h) - Ajustado para mejor rango Fibo
   const last500 = closes.slice(-500);
   const max14 = Math.max(...last500);
   const min14 = Math.min(...last500);
@@ -206,17 +207,28 @@ async function analyze(symbol){
   const rr1 = (t1272 - price)/riskAbs;
   const rr2 = (t1618 - price)/riskAbs;
 
-  // === IMPLEMENTACIÓN DEL FILTRO DE UPSIDE (10% - 40%) ===
+
+  // === FILTRO 1: UPSIDE (10% - 40%) ===
   const MIN_UPSIDE = 10;
   const MAX_UPSIDE = 40;
 
-  const meetsUpside1 = up1 >= MIN_UPSIDE && up1 <= MAX_UPSIDE;
-  const meetsUpside2 = up2 >= MIN_UPSIDE && up2 <= MAX_UPSIDE;
+  // El token pasa si T1 o T2 cumplen el rango de Upside
+  const meetsUpside = (up1 >= MIN_UPSIDE && up1 <= MAX_UPSIDE) || (up2 >= MIN_UPSIDE && up2 <= MAX_UPSIDE);
 
-  // Descartar si ningún target cumple el rango de ganancia (10-40%)
-  if (!meetsUpside1 && !meetsUpside2) {
-    throw new Error(`Upside ${pct(up1)}/${pct(up2)} fuera de rango ${MIN_UPSIDE}%-${MAX_UPSIDE}%`);
+  if (!meetsUpside) {
+    throw new Error(`Filtro: Upside ${pct(up1)}/${pct(up2)} fuera de rango ${MIN_UPSIDE}%-${MAX_UPSIDE}%`);
   }
+  
+  // === FILTRO 2: RIESGO/RECOMPENSA (RR >= 2.0x) ===
+  const MIN_RR = 2.0;
+
+  // El token pasa si T1 o T2 tienen un RR aceptable
+  const meetsRR = rr1 >= MIN_RR || rr2 >= MIN_RR;
+
+  if (!meetsRR) {
+    throw new Error(`Filtro: RR T1=${fmt(rr1)}x / T2=${fmt(rr2)}x es menor a ${MIN_RR}x`);
+  }
+
 
   // Ranking simple ponderando volumen
   const volScore = volumeHint ? Math.tanh(volumeHint) : 0; // normaliza 0..1
@@ -229,7 +241,7 @@ async function analyze(symbol){
   };
 }
 
-/* =============== RENDER (MODIFICADO para manejar los filtros) =============== */
+/* =============== RENDER (MODIFICADO para manejar los filtros de Upside y RR) =============== */
 function rowHTML(o){
   return `
   <tr class="border-b border-gray-800 ${o.rowClass}">
@@ -291,17 +303,16 @@ async function render(){
       .join("");
 
     // Mensajes: Errores graves de API/datos y resumen de tokens filtrados
-    // Identificamos errores de la API (problemas de conexión o data)
     const apiErrors = results
       .filter(r => r.status==="rejected" && (String(r.reason).includes("HTTP") || String(r.reason).includes("data vacío") || String(r.reason).includes("insuficiente")))
       .map((r)=> `<tr class="border-b border-gray-800 text-red-400"><td colspan="13">Error de datos: ${r.reason?.message || "Desconocido"}</td></tr>`)
       .join("");
 
-    // Contamos los tokens filtrados por la regla de Upside
-    const filteredTokensCount = results.filter(r => r.status==="rejected" && String(r.reason).includes("Upside")).length;
+    // Contamos los tokens filtrados por la regla de Upside Y RR
+    const filteredTokensCount = results.filter(r => r.status==="rejected" && String(r.reason).includes("Filtro:")).length;
 
     const filterSummary = filteredTokensCount > 0
-      ? `<tr class="border-b border-gray-800 text-yellow-400"><td colspan="13">${filteredTokensCount} tokens filtrados (Upside < 10% o > 40%).</td></tr>`
+      ? `<tr class="border-b border-gray-800 text-yellow-400"><td colspan="13">${filteredTokensCount} tokens filtrados (No cumplen Upside $10\%-40\%$ **o** RR $\ge 2.0x$).</td></tr>`
       : "";
 
     html += rows + filterSummary + apiErrors;
@@ -339,9 +350,4 @@ render();
 </script>
 
 <p class="text-xs text-gray-500 mt-4 text-center">
-v4.2 (Modificado) — Pares activos y líquidos, Binance 1h con fallback CoinGecko, ranking por cercanía de entrada, categorías colapsables, cache local.<br/>
-**Filtro Activo:** Solo muestra tokens con Upside potencial entre 10% y 40% a Targets Fibonacci (1.272 o 1.618).
-No constituye asesoramiento financiero. Operar con gestión de riesgo.
-</p>
-</body>
-</html>
+v4.3 (Final) — Pares activos y líquidos, Binance 1h con fallback CoinGecko, ranking por
