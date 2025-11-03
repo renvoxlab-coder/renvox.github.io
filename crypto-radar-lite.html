@@ -3,20 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RENVOX Crypto Radar — Binance v3.2</title>
+<title>RENVOX Crypto Radar — Binance v3.3</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
   .chip{padding:.3rem .6rem;border-radius:9999px;font-weight:600}
   a.btn{background:#16a34a;color:white;padding:.25rem .6rem;border-radius:.5rem;font-weight:600;transition:all .2s}
   a.btn:hover{background:#22c55e}
+  tr.highlight-green{background-color:#064e3b !important;}
+  tr.highlight-blue{background-color:#0c4a6e !important;}
 </style>
 </head>
 <body class="p-6">
-<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v3.2</h1>
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v3.3</h1>
 <p class="text-gray-400 text-center mb-6">
 Datos directos desde Binance API (velas 1h). RSI14 · EMA20/50 · Fibonacci (14d).<br>
-Actualiza automáticamente cada 1 hora. Incluye acceso a gráfico y análisis automático.
+Actualiza automáticamente cada 1 hora. Destaca tokens con entrada técnica potencial.
 </p>
 
 <div class="overflow-x-auto border border-gray-700 rounded-xl">
@@ -38,7 +40,7 @@ Actualiza automáticamente cada 1 hora. Incluye acceso a gráfico y análisis au
 </div>
 
 <script>
-const pairs=["BTCUSDT","ETHUSDT","SOLUSDT"];
+const pairs=["BTCUSDT","ETHUSDT","SOLUSDT","AVAXUSDT","LINKUSDT","INJUSDT"];
 const REFRESH_INTERVAL=3600000; // 1 hora
 
 function ema(values,span){
@@ -67,7 +69,7 @@ function motivo(signal,rsi){
 }
 
 function linkGrafico(symbol){
-  const base = symbol.replace("USDT","");
+  const base=symbol.replace("USDT","");
   return `https://www.tradingview.com/symbols/${base}USDT/`;
 }
 
@@ -90,16 +92,16 @@ async function analyze(symbol){
   const inZone=price>=fib50&&price<=fib618;
   const trendUp=ema20>ema50;
 
-  let signal="⚪ Mirar",color="text-gray-300";
-  if(inZone&&trendUp&&rsi14>=50&&rsi14<=65){signal="🟢 Pullback";color="text-green-400";}
-  else if(price>max&&trendUp&&rsi14>60){signal="🔵 Breakout";color="text-cyan-400";}
+  let signal="⚪ Mirar",color="text-gray-300",rowClass="";
+  if(inZone&&trendUp&&rsi14>=50&&rsi14<=65){signal="🟢 Pullback";color="text-green-400";rowClass="highlight-green";}
+  else if(price>max&&trendUp&&rsi14>60){signal="🔵 Breakout";color="text-cyan-400";rowClass="highlight-blue";}
   else if(rsi14>70){signal="🔴 Caliente";color="text-red-400";}
 
   const desc=motivo(signal,rsi14);
   const chart=linkGrafico(symbol);
 
   return `
-    <tr class='border-b border-gray-800'>
+    <tr class='border-b border-gray-800 ${rowClass}'>
       <td class='py-2 font-semibold'>${symbol}</td>
       <td>$${price.toFixed(2)}</td>
       <td>${rsi14.toFixed(1)}</td>
@@ -133,8 +135,9 @@ render();
 </script>
 
 <p class="text-xs text-gray-500 mt-4 text-center">
-v3.2 — Procesamiento paralelo + explicación automática + botón de gráfico.<br>
-Datos en vivo desde Binance API (1h velas, 500 registros). Calcula RSI14, EMA20/50 y niveles Fibonacci (14d).
+v3.3 — Seis tokens, colores por oportunidad, y botón a gráfico en TradingView.<br>
+Datos en vivo desde Binance API (1h velas, 500 registros). Calcula RSI14, EMA20/50 y niveles Fibonacci (14d).<br>
+🟢 Pullback = posible rebote técnico • 🔵 Breakout = impulso confirmado.
 </p>
 </body>
 </html>
