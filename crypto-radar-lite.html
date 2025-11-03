@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RENVOX Crypto Radar — Lite</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
+  .chip{padding:.3rem .6rem;border-radius:9999px;font-weight:600}
+</style>
+</head>
+<body class="p-6">
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Lite</h1>
+<p class="text-gray-400 text-center mb-6">Análisis técnico básico (RSI, EMA, Fibonacci) directo desde CoinGecko<br>Sin backend • 3 tokens rotativos • 20 s refresco</p>
+
+<div class="overflow-x-auto border border-gray-700 rounded-xl">
+<table class="w-full text-sm text-center" id="table">
+  <thead class="bg-gray-800 text-gray-300">
+    <tr>
+      <th class="py-2">Token</th>
+      <th class="py-2">Precio</th>
+      <th class="py-2">RSI14</th>
+      <th class="py-2">EMA20/50</th>
+      <th class="py-2">Zona Fibo</th>
+      <th class="py-2">Señal</th>
+    </tr>
+  </thead>
+  <tbody id="rows" class="bg-gray-900"></tbody>
+</table>
+</div>
+
+<script>
+const coins=["bitcoin","ethereum","solana"];
+let idx=0;
+
+function ema(values,span){
+  const k=2/(span+1);let emaArr=[values[0]];let prev=values[0];
+  for(let i=1;i<values.length;i++){prev=values[i]*k+prev*(1-k);emaArr.push(prev);}
+  return emaArr;
+}
+function rsi(values,period=14){
+  let gains=0,losses=0;
+  for(let i=1;i<=period;i++){const d=values[i]-values[i-1];if(d>=0)gains+=d;else losses-=d;}
+  let avgG=gains/period,avgL=losses/period;const out=[];
+  for(let i=period+1;i<values.length;i++){
+    const d=values[i]-values[i-1];const g=Math.max(d,0),l=Math.max(-d,0);
+    avgG=(avgG*(period-1)+g)/period;avgL=(avgL*(period-1)+l)/period;
+    const rs=avgL===0?100:avgG/avgL;out.push(100-(100/(1+rs)));
+  }return out.at(-1);
+}
+async function analyze(id){
+  const r=await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=30&interval=hourly`);
+  const data=await r.json();
+  const closes=data.prices.map(p=>p[1]);
+  const price=closes.at(-1);
+  const ema20=ema(closes,20).at(-1);
+  const ema50=ema(closes,50).at(-1);
+  const rsi14=rsi(closes,14);
+  const max=Math.max(...closes.slice(-24*14));
+  const min=Math.min(...closes.slice(-24*14));
+  const fib50=min+0.5*(max-min);
+  const fib618=min+0.618*(max-min);
+  const inZone=price>=fib50&&price<=fib618;
+  const trendUp=ema20>ema50;
+  let signal="⚪ Mirar",color="text-gray-300";
+  if(inZone&&trendUp&&rsi14>=50&&rsi14<=65){signal="🟢 Pullback";color="text-green-400";}
+  else if(price>max&&trendUp&&rsi14>60){signal="🔵 Breakout";color="text-cyan-400";}
+  const tr=`<tr class='border-b border-gray-800'>
+    <td class='py-2 font-semibold'>${id.toUpperCase()}</td>
+    <td>$${price.toFixed(2)}</td>
+    <td>${rsi14.toFixed(1)}</td>
+    <td>${ema20.toFixed(1)} / ${ema50.toFixed(1)}</td>
+    <td>${fib50.toFixed(1)}–${fib618.toFixed(1)}</td>
+    <td class='${color} font-bold'>${signal}</td>
+  </tr>`;
+  return tr;
+}
+
+async function render(){
+  const rows=document.getElementById('rows');
+  const id=coins[idx%coins.length];
+  rows.innerHTML=`<tr><td colspan='6' class='p-4 text-gray-400'>Analizando ${id}...</td></tr>`;
+  try{
+    const row=await analyze(id);
+    if(idx%coins.length===0) rows.innerHTML='';
+    rows.innerHTML+=row;
+  }catch(e){
+    rows.innerHTML=`<tr><td colspan='6' class='p-4 text-red-400'>Error ${e.message}</td></tr>`;
+  }
+  idx++;
+  if(idx%coins.length!==0) setTimeout(render,4000);
+  else setTimeout(()=>{idx=0;render();},20000);
+}
+render();
+</script>
+
+<p class="text-xs text-gray-500 mt-4">Calcula RSI14, EMA20/50 y niveles Fibonacci (últimos 14 d). 
+Señales orientativas, no constituyen recomendación financiera.</p>
+</body>
+</html>
