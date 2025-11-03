@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RENVOX Crypto Radar — Lite (AllOrigins)</title>
+<title>RENVOX Crypto Radar — Binance Edition</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
@@ -11,8 +11,8 @@
 </style>
 </head>
 <body class="p-6">
-<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Lite</h1>
-<p class="text-gray-400 text-center mb-6">Usa proxy AllOrigins para evitar CORS<br>Analiza BTC, ETH y SOL con RSI, EMA y Fibonacci</p>
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance</h1>
+<p class="text-gray-400 text-center mb-6">Datos directos desde Binance API<br>RSI14 · EMA20/50 · Fibonacci (14d) — sin CORS ni backend</p>
 
 <div class="overflow-x-auto border border-gray-700 rounded-xl">
 <table class="w-full text-sm text-center" id="table">
@@ -31,7 +31,7 @@
 </div>
 
 <script>
-const coins=["bitcoin","ethereum","solana"];
+const pairs=["BTCUSDT","ETHUSDT","SOLUSDT"];
 let idx=0;
 
 function ema(values,span){
@@ -51,12 +51,11 @@ function rsi(values,period=14){
   return 100-(100/(1+rs));
 }
 
-async function analyze(id){
-  const apiUrl=`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=30&interval=hourly`;
-  const proxy=`https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
-  const r=await fetch(proxy);
+async function analyze(symbol){
+  const url=`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=500`;
+  const r=await fetch(url);
   const data=await r.json();
-  const closes=data.prices.map(p=>p[1]);
+  const closes=data.map(k=>parseFloat(k[4]));
   const price=closes.at(-1);
   const ema20=ema(closes,20).at(-1);
   const ema50=ema(closes,50).at(-1);
@@ -71,7 +70,7 @@ async function analyze(id){
   if(inZone&&trendUp&&rsi14>=50&&rsi14<=65){signal="🟢 Pullback";color="text-green-400";}
   else if(price>max&&trendUp&&rsi14>60){signal="🔵 Breakout";color="text-cyan-400";}
   const tr=`<tr class='border-b border-gray-800'>
-    <td class='py-2 font-semibold'>${id.toUpperCase()}</td>
+    <td class='py-2 font-semibold'>${symbol}</td>
     <td>$${price.toFixed(2)}</td>
     <td>${rsi14.toFixed(1)}</td>
     <td>${ema20.toFixed(1)} / ${ema50.toFixed(1)}</td>
@@ -83,25 +82,25 @@ async function analyze(id){
 
 async function render(){
   const rows=document.getElementById('rows');
-  const id=coins[idx%coins.length];
-  rows.innerHTML=`<tr><td colspan='6' class='p-4 text-gray-400'>Analizando ${id}...</td></tr>`;
+  const pair=pairs[idx%pairs.length];
+  rows.innerHTML=`<tr><td colspan='6' class='p-4 text-gray-400'>Analizando ${pair}...</td></tr>`;
   try{
-    const row=await analyze(id);
-    if(idx%coins.length===0) rows.innerHTML='';
+    const row=await analyze(pair);
+    if(idx%pairs.length===0) rows.innerHTML='';
     rows.innerHTML+=row;
   }catch(e){
     rows.innerHTML=`<tr><td colspan='6' class='p-4 text-red-400'>Error ${e.message}</td></tr>`;
   }
   idx++;
-  if(idx%coins.length!==0) setTimeout(render,6000);
-  else setTimeout(()=>{idx=0;render();},25000);
+  if(idx%pairs.length!==0) setTimeout(render,5000);
+  else setTimeout(()=>{idx=0;render();},30000);
 }
 render();
 </script>
 
 <p class="text-xs text-gray-500 mt-4 text-center">
-Calcula RSI14, EMA20/50 y niveles Fibonacci (últimos 14 d) usando CoinGecko vía proxy AllOrigins.<br>
-Sin backend, apto para GitHub Pages. No constituye asesoramiento financiero.
+Datos en vivo desde Binance API (1h velas, 500 registros). Calcula RSI14, EMA20/50 y niveles Fibonacci (últimos 14 días).<br>
+No requiere backend ni proxy, 100 % compatible con GitHub Pages.
 </p>
 </body>
 </html>
