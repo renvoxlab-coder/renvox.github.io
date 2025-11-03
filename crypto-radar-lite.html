@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RENVOX Crypto Radar — Binance Edition</title>
+<title>RENVOX Crypto Radar — Binance v3</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
@@ -11,8 +11,11 @@
 </style>
 </head>
 <body class="p-6">
-<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance</h1>
-<p class="text-gray-400 text-center mb-6">Datos directos desde Binance API<br>RSI14 · EMA20/50 · Fibonacci (14d) — sin CORS ni backend</p>
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v3</h1>
+<p class="text-gray-400 text-center mb-6">
+Datos directos desde Binance API (velas de 1h).<br>
+RSI14 · EMA20/50 · Fibonacci (14d). Refresca cada 1 hora automáticamente.
+</p>
 
 <div class="overflow-x-auto border border-gray-700 rounded-xl">
 <table class="w-full text-sm text-center" id="table">
@@ -54,7 +57,10 @@ function rsi(values,period=14){
 async function analyze(symbol){
   const url=`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=500`;
   const r=await fetch(url);
+  if(!r.ok) throw new Error(`HTTP ${r.status}`);
   const data=await r.json();
+  if(!Array.isArray(data) || data.length===0 || !Array.isArray(data[0])) throw new Error(`Datos inválidos (${symbol})`);
+
   const closes=data.map(k=>parseFloat(k[4]));
   const price=closes.at(-1);
   const ema20=ema(closes,20).at(-1);
@@ -92,15 +98,17 @@ async function render(){
     rows.innerHTML=`<tr><td colspan='6' class='p-4 text-red-400'>Error ${e.message}</td></tr>`;
   }
   idx++;
-  if(idx%pairs.length!==0) setTimeout(render,5000);
-  else setTimeout(()=>{idx=0;render();},30000);
+  // Espera 6 s entre tokens y 1 h entre ciclos completos
+  if(idx%pairs.length!==0) setTimeout(render,6000);
+  else setTimeout(()=>{idx=0;render();},3600000);
 }
+
 render();
 </script>
 
 <p class="text-xs text-gray-500 mt-4 text-center">
 Datos en vivo desde Binance API (1h velas, 500 registros). Calcula RSI14, EMA20/50 y niveles Fibonacci (últimos 14 días).<br>
-No requiere backend ni proxy, 100 % compatible con GitHub Pages.
+Actualiza automáticamente cada 1 hora. 100 % compatible con GitHub Pages.
 </p>
 </body>
 </html>
