@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RENVOX Crypto Radar — Binance v4.1</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
+  a.btn{background:#16a34a;color:white;padding:.25rem .6rem;border-radius:.5rem;font-weight:600;transition:all .2s}
+  a.btn:hover{background:#22c55e}
+  th, td {text-align: right; padding-right: .75rem;}
+  th:first-child, td:first-child {text-align: left;}
+  tr.highlight-green{background-color:#064e3b !important;}
+  tr.highlight-blue{background-color:#0c4a6e !important;}
+  tr.highlight-yellow{background-color:#78350f !important;}
+  .muted{color:#94a3b8}
+  .category-row{background:#1f2937;font-weight:600;color:#93c5fd;text-align:left;}
+</style>
+</head>
+<body class="p-6">
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v4.1</h1>
+<p class="text-gray-400 text-center mb-6">
+Agrupado por tendencia: IA 🤖 · Energía ⚡ · Infraestructura 🏗️ · Mainstream 💰.<br>
+Ordenado por proximidad a entrada y riesgo técnico.
+</p>
+
+<div class="overflow-x-auto border border-gray-700 rounded-xl">
+<table class="w-full text-xs md:text-sm" id="table">
+  <thead class="bg-gray-800 text-gray-300">
+    <tr>
+      <th class="py-2">Token</th>
+      <th>Precio</th>
+      <th>RSI</th>
+      <th>EMA20/50</th>
+      <th>Señal</th>
+      <th>Riesgo</th>
+      <th>🎯 Targets</th>
+      <th>📈 Upside</th>
+      <th>⚖️ RR</th>
+      <th>🛟 Stop</th>
+      <th>Gráfico</th>
+    </tr>
+  </thead>
+  <tbody id="rows" class="bg-gray-900"></tbody>
+</table>
+</div>
+
+<script>
+const categories = {
+  "🤖 Inteligencia Artificial": ["RNDRUSDT","FETUSDT","GRTUSDT","OCEANUSDT","AGIXUSDT"],
+  "⚡ Energía y Baterías": ["NEOUSDT","IOTAUSDT","ICPUSDT","NKNUSDT","POWRUSDT"],
+  "🏗️ Infraestructura": ["LINKUSDT","INJUSDT","ARBUSDT","OPUSDT","AVAXUSDT"],
+  "💰 Mainstream": ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT"]
+};
+const REFRESH_INTERVAL=3600000;
+
+function ema(values,span){
+  const k=2/(span+1);let prev=values[0],out=[prev];
+  for(let i=1;i<values.length;i++){prev=values[i]*k+prev*(1-k);out.push(prev);}return out;
+}
+function rsi(values,p=14){
+  let g=0,l=0;for(let i=1;i<=p;i++){const d=values[i]-values[i-1];if(d>=0)g+=d;else l-=d;}
+  let ag=g/p,al=l/p;for(let i=p+1;i<values.length;i++){const d=values[i]-values[i-1];
+  const gain=Math.max(d,0),loss=Math.max(-d,0);ag=(ag*(p-1)+gain)/p;al=(al*(p-1)+loss)/p;}
+  const rs=al===0?100:ag/al;return 100-(100/(1+rs));
+}
+const fmt=(n,fd=2)=>Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:fd}):"-";
+function linkGrafico(sym){return `https://www.tradingview.com/symbols/${sym.replace("USDT","")}USDT/`;}
+function riesgo(rsi,g){if(rsi<45&&g<2)return{txt:"🟩 Bajo",c:"text-green-400"};if(rsi>65||g>4)return{txt:"🟥 Alto",c:"text-red-400"};return{txt:"🟨 Medio",c:"text-yellow-400"};}
+function rankOrder(signal,risk,up){let s=0;if(signal.includes("Pullback"))s+=3;if(signal.includes("leve"))s+=2;if(signal.includes("Breakout"))s+=1;if(risk.txt.includes("Bajo"))s+=1;if(up>0)s+=1;return s;}
+
+async function analyze(symbol){
+  const url=`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=500`;
+  const r=await fetch(url); if(!r.ok) throw new Error(`HTTP ${r.status}`); const data=await r.json();
+  const closes=data.map(k=>parseFloat(k[4])); const price=closes.at(-1);
+  const ema20=ema(closes,20).at(-1),ema50=ema(closes,50).at(-1),rsi14=rsi(closes,14);
+  const last336=closes.slice(-336); const max=Math.max(...last336),min=Math.min(...last336),range=max-min||1;
+  const fib50=min+0.5*range,fib618=min+0.618*range,t1272=min+1.272*range,t1618=min+1.618*range;
+  const inZone=price>=fib50&&price<=fib618; const trendUp=ema20>ema50;
+  let signal="⚪ Mirar",col="text-gray-300",cls=""; if(inZone&&trendUp&&rsi14>=50&&rsi14<=65){signal="🟢 Pullback";col="text-green-400";cls="highlight-green";}
+  else if(inZone&&rsi14>=40&&rsi14<=70){signal="🟡 Pullback leve";col="text-yellow-400";cls="highlight-yellow";}
+  else if(price>max&&trendUp&&rsi14>60){signal="🔵 Breakout";col="text-cyan-400";cls="highlight-blue";}
+  else if(rsi14>70){signal="🔴 Caliente";col="text-red-400";}
+  const gap=Math.abs(ema20-ema50)/((ema20+ema50)/2)*100; const risk=riesgo(rsi14,gap);
+  const up1=((t1272-price)/price)*100; const rr=((t1272-price)/(price-(fib618*0.995)));
+  return {symbol,price,rsi14,ema20,ema50,signal,col,cls,risk,up1,rr,link:linkGrafico(symbol),rank:rankOrder(signal,risk,up1)};
+}
+
+async function render(){
+  const rows=document.getElementById("rows"); rows.innerHTML=`<tr><td colspan='11' class='p-4 text-gray-400'>Cargando datos...</td></tr>`;
+  let html="";
+  for(const [cat,tokens] of Object.entries(categories)){
+    html+=`<tr class='category-row'><td colspan='11'>${cat}</td></tr>`;
+    const results=await Promise.allSettled(tokens.map(analyze));
+    const valid=results.filter(r=>r.value).map(r=>r.value).sort((a,b)=>b.rank-a.rank);
+    for(const t of valid){
+      html+=`
+      <tr class='border-b border-gray-800 ${t.cls}'>
+        <td>${t.symbol}</td>
+        <td>$${fmt(t.price)}</td>
+        <td>${fmt(t.rsi14)}</td>
+        <td>${fmt(t.ema20)} / ${fmt(t.ema50)}</td>
+        <td class='${t.col} font-bold'>${t.signal}</td>
+        <td class='${t.risk.c} font-semibold'>${t.risk.txt}</td>
+        <td>$${fmt(t.price+(t.price*0.05))}</td>
+        <td class='${t.up1>0?"text-green-400":"text-gray-400"}'>${fmt(t.up1)}%</td>
+        <td class='${t.rr>0?"text-green-400":"text-gray-400"}'>${fmt(t.rr,2)}x</td>
+        <td>$${fmt(t.price*0.97)}</td>
+        <td><a href='${t.link}' target='_blank' class='btn'>Ver</a></td>
+      </tr>`;
+    }
+  }
+  rows.innerHTML=html;
+  console.log("✅ Actualizado:",new Date().toLocaleTimeString());
+  setTimeout(render,REFRESH_INTERVAL);
+}
+render();
+</script>
+
+<p class="text-xs text-gray-500 mt-4 text-center">
+v4.1 — Agrupa tokens por tendencia (IA, Energía, Infraestructura, Mainstream).  
+Ordenados por probabilidad técnica de entrada. Datos Binance (klines 1h).  
+🟢 Pullback confirmado · 🟡 Recuperación leve · 🔵 Breakout · ⚪ Mirar · 🔴 Caliente.
+</p>
+</body>
+</html>
