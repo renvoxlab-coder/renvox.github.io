@@ -3,18 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RENVOX Crypto Radar — Binance v3</title>
+<title>RENVOX Crypto Radar — Binance v3.2</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{background:#0b0e12;color:#e2e8f0;font-family:Inter,Arial,sans-serif}
   .chip{padding:.3rem .6rem;border-radius:9999px;font-weight:600}
+  a.btn{background:#16a34a;color:white;padding:.25rem .6rem;border-radius:.5rem;font-weight:600;transition:all .2s}
+  a.btn:hover{background:#22c55e}
 </style>
 </head>
 <body class="p-6">
-<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v3</h1>
+<h1 class="text-3xl font-bold text-green-400 mb-2 text-center">RENVOX Crypto Radar — Binance v3.2</h1>
 <p class="text-gray-400 text-center mb-6">
-Datos directos desde Binance API (velas de 1h).<br>
-RSI14 · EMA20/50 · Fibonacci (14d). Refresca cada 1 hora automáticamente.
+Datos directos desde Binance API (velas 1h). RSI14 · EMA20/50 · Fibonacci (14d).<br>
+Actualiza automáticamente cada 1 hora. Incluye acceso a gráfico y análisis automático.
 </p>
 
 <div class="overflow-x-auto border border-gray-700 rounded-xl">
@@ -27,6 +29,8 @@ RSI14 · EMA20/50 · Fibonacci (14d). Refresca cada 1 hora automáticamente.
       <th class="py-2">EMA20/50</th>
       <th class="py-2">Zona Fibo</th>
       <th class="py-2">Señal</th>
+      <th class="py-2">Motivo</th>
+      <th class="py-2">Gráfico</th>
     </tr>
   </thead>
   <tbody id="rows" class="bg-gray-900"></tbody>
@@ -35,7 +39,7 @@ RSI14 · EMA20/50 · Fibonacci (14d). Refresca cada 1 hora automáticamente.
 
 <script>
 const pairs=["BTCUSDT","ETHUSDT","SOLUSDT"];
-let idx=0;
+const REFRESH_INTERVAL=3600000; // 1 hora
 
 function ema(values,span){
   const k=2/(span+1);let emaArr=[values[0]];let prev=values[0];
@@ -54,12 +58,25 @@ function rsi(values,period=14){
   return 100-(100/(1+rs));
 }
 
+function motivo(signal,rsi){
+  if(signal.includes("Pullback")) return "Zona de retroceso técnico, posible rebote alcista.";
+  if(signal.includes("Breakout")) return "Rompió resistencia, momentum positivo.";
+  if(rsi<40) return "Sobreventa moderada, esperar confirmación.";
+  if(rsi>70) return "RSI alto, riesgo de corrección.";
+  return "Tendencia lateral, sin señal clara.";
+}
+
+function linkGrafico(symbol){
+  const base = symbol.replace("USDT","");
+  return `https://www.tradingview.com/symbols/${base}USDT/`;
+}
+
 async function analyze(symbol){
   const url=`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=500`;
   const r=await fetch(url);
   if(!r.ok) throw new Error(`HTTP ${r.status}`);
   const data=await r.json();
-  if(!Array.isArray(data) || data.length===0 || !Array.isArray(data[0])) throw new Error(`Datos inválidos (${symbol})`);
+  if(!Array.isArray(data)||data.length===0) throw new Error(`Datos inválidos (${symbol})`);
 
   const closes=data.map(k=>parseFloat(k[4]));
   const price=closes.at(-1);
@@ -72,43 +89,52 @@ async function analyze(symbol){
   const fib618=min+0.618*(max-min);
   const inZone=price>=fib50&&price<=fib618;
   const trendUp=ema20>ema50;
+
   let signal="⚪ Mirar",color="text-gray-300";
   if(inZone&&trendUp&&rsi14>=50&&rsi14<=65){signal="🟢 Pullback";color="text-green-400";}
   else if(price>max&&trendUp&&rsi14>60){signal="🔵 Breakout";color="text-cyan-400";}
-  const tr=`<tr class='border-b border-gray-800'>
-    <td class='py-2 font-semibold'>${symbol}</td>
-    <td>$${price.toFixed(2)}</td>
-    <td>${rsi14.toFixed(1)}</td>
-    <td>${ema20.toFixed(1)} / ${ema50.toFixed(1)}</td>
-    <td>${fib50.toFixed(1)}–${fib618.toFixed(1)}</td>
-    <td class='${color} font-bold'>${signal}</td>
-  </tr>`;
-  return tr;
+  else if(rsi14>70){signal="🔴 Caliente";color="text-red-400";}
+
+  const desc=motivo(signal,rsi14);
+  const chart=linkGrafico(symbol);
+
+  return `
+    <tr class='border-b border-gray-800'>
+      <td class='py-2 font-semibold'>${symbol}</td>
+      <td>$${price.toFixed(2)}</td>
+      <td>${rsi14.toFixed(1)}</td>
+      <td>${ema20.toFixed(1)} / ${ema50.toFixed(1)}</td>
+      <td>${fib50.toFixed(1)}–${fib618.toFixed(1)}</td>
+      <td class='${color} font-bold'>${signal}</td>
+      <td class='text-gray-300 text-sm'>${desc}</td>
+      <td><a href='${chart}' target='_blank' class='btn'>Ver gráfico</a></td>
+    </tr>`;
 }
 
 async function render(){
   const rows=document.getElementById('rows');
-  const pair=pairs[idx%pairs.length];
-  rows.innerHTML=`<tr><td colspan='6' class='p-4 text-gray-400'>Analizando ${pair}...</td></tr>`;
-  try{
-    const row=await analyze(pair);
-    if(idx%pairs.length===0) rows.innerHTML='';
-    rows.innerHTML+=row;
-  }catch(e){
-    rows.innerHTML=`<tr><td colspan='6' class='p-4 text-red-400'>Error ${e.message}</td></tr>`;
-  }
-  idx++;
-  // Espera 6 s entre tokens y 1 h entre ciclos completos
-  if(idx%pairs.length!==0) setTimeout(render,6000);
-  else setTimeout(()=>{idx=0;render();},3600000);
+  rows.innerHTML=`<tr><td colspan='8' class='p-4 text-gray-400'>Cargando datos desde Binance...</td></tr>`;
+  
+  const promises=pairs.map(async(p)=>{
+    try{return await analyze(p);}
+    catch(e){
+      console.warn("Error",p,e);
+      return `<tr class='border-b border-gray-800 text-red-400'><td colspan='8'>Error ${p}: ${e.message}</td></tr>`;
+    }
+  });
+
+  const results=await Promise.allSettled(promises);
+  rows.innerHTML=results.map(r=>r.value||'').join('');
+  console.log("✅ Actualización completada:",new Date().toLocaleTimeString());
+  setTimeout(render,REFRESH_INTERVAL);
 }
 
 render();
 </script>
 
 <p class="text-xs text-gray-500 mt-4 text-center">
-Datos en vivo desde Binance API (1h velas, 500 registros). Calcula RSI14, EMA20/50 y niveles Fibonacci (últimos 14 días).<br>
-Actualiza automáticamente cada 1 hora. 100 % compatible con GitHub Pages.
+v3.2 — Procesamiento paralelo + explicación automática + botón de gráfico.<br>
+Datos en vivo desde Binance API (1h velas, 500 registros). Calcula RSI14, EMA20/50 y niveles Fibonacci (14d).
 </p>
 </body>
 </html>
